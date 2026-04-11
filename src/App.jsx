@@ -337,15 +337,34 @@ function Topbar({
 
 function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-[20px] border p-4 transition-all duration-300 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]", alert ? "border-rose-200" : "border-slate-200")}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-[22px] border bg-white p-5 transition-all duration-300 shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]",
+        alert ? "border-rose-200" : "border-slate-200"
+      )}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
       <div className="relative flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400 font-semibold">{title}</p>
-          <p className="text-3xl font-semibold text-slate-900 mt-2">{value}</p>
-          <p className="text-sm text-slate-500 mt-1.5">{subtitle}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            {title}
+          </p>
+          <p className="mt-3 text-[2.5rem] font-bold leading-none tracking-tight text-slate-900">
+            {value}
+          </p>
+          <p className="mt-3 text-sm text-slate-500">
+            {subtitle}
+          </p>
         </div>
-        <div className={cn("absolute top-4 right-4 h-10 w-10 rounded-xl flex items-center justify-center", alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700")}><Icon className="h-5 w-5" /></div>
+
+        <div
+          className={cn(
+            "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
+            alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700"
+          )}
+        >
+          <Icon className="h-6 w-6" />
+        </div>
       </div>
     </div>
   );
