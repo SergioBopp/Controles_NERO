@@ -136,14 +136,14 @@ async function loadImageDataUrl(src) {
 }
 
 function Card({ children, className = "" }) {
-  return <div className={cn("rounded-[28px] border border-slate-200 bg-white shadow-sm", className)}>{children}</div>;
+  return <div className={cn("rounded-[22px] border border-slate-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]", className)}>{children}</div>;
 }
 
 function CardHeader({ title, description, right }) {
   return (
-    <div className="p-5 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="px-5 py-4 border-b border-slate-200/70 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between bg-slate-50/70 rounded-t-[22px]">
       <div>
-        <h3 className="text-lg font-bold tracking-tight text-slate-900">{title}</h3>
+        <h3 className="text-base font-semibold tracking-tight text-slate-900">{title}</h3>
         {description ? <p className="text-sm text-slate-500 mt-1">{description}</p> : null}
       </div>
       {right}
@@ -153,14 +153,14 @@ function CardHeader({ title, description, right }) {
 
 function Button({ children, variant = "primary", className = "", ...props }) {
   const styles = {
-    primary: "bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-800",
-    outline: "bg-white text-slate-700 border-slate-300 hover:bg-emerald-50 hover:border-emerald-200",
-    danger: "bg-rose-600 text-white border-rose-600 hover:bg-rose-700",
+    primary: "bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-800 shadow-sm",
+    outline: "bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400",
+    danger: "bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-sm",
   };
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-2xl border px-4 h-11 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-2 rounded-xl border px-4 h-10 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
         styles[variant],
         className
       )}
@@ -172,16 +172,16 @@ function Button({ children, variant = "primary", className = "", ...props }) {
 }
 
 function Badge({ children, className = "" }) {
-  return <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium", className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-medium tracking-[0.02em]", className)}>{children}</span>;
 }
 
 function Input({ className = "", ...props }) {
-  return <input className={cn("w-full rounded-2xl border border-slate-300 bg-white px-4 h-11 text-sm outline-none focus:border-emerald-500", className)} {...props} />;
+  return <input className={cn("w-full rounded-xl border border-slate-300 bg-white px-3.5 h-10 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100", className)} {...props} />;
 }
 
 function SelectField({ value, onChange, options, className = "" }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={cn("w-full rounded-2xl border border-slate-300 bg-white px-4 h-11 text-sm outline-none focus:border-emerald-500", className)}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={cn("w-full rounded-xl border border-slate-300 bg-white px-3.5 h-10 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100", className)}>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   );
@@ -215,7 +215,7 @@ function Field({ label, children }) {
 function LogoBlock() {
   return (
     <div className="flex items-center gap-4">
-      <div className="h-20 w-20 rounded-[28px] overflow-hidden bg-white shadow-md border border-emerald-100 flex items-center justify-center">
+      <div className="h-16 w-16 rounded-[20px] overflow-hidden bg-white shadow-sm border border-slate-200 flex items-center justify-center">
         <img
           src={LOGO_SRC}
           alt="Logo NERO"
@@ -229,9 +229,9 @@ function LogoBlock() {
         <div className="hidden h-full w-full items-center justify-center bg-gradient-to-r from-emerald-700 to-emerald-800 text-white text-3xl font-bold">N</div>
       </div>
       <div>
-        <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Sistema Web</p>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none mt-2">NERO</h1>
-        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-none mt-1">Construções</h2>
+        <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sistema Web</p>
+        <h1 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-2">NERO</h1>
+        <h2 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-1">Construções</h2>
       </div>
     </div>
   );
@@ -240,11 +240,11 @@ function LogoBlock() {
 function Sidebar({ currentPage, setCurrentPage }) {
   const sidebarPages = ["dashboard", "stock", "maintenance", "attendance", "history"];
   return (
-    <aside className="hidden md:flex md:w-80 lg:w-[320px] border-r border-slate-200 bg-gradient-to-b from-slate-50 to-slate-200 flex-col">
-      <div className="px-7 py-8 border-b border-slate-200 bg-gradient-to-b from-emerald-50/70 to-white">
+    <aside className="hidden md:flex md:w-72 lg:w-[290px] border-r border-slate-200 bg-white flex-col">
+      <div className="px-6 py-6 border-b border-slate-200 bg-white">
         <LogoBlock />
       </div>
-      <nav className="flex-1 p-5 space-y-3">
+      <nav className="flex-1 p-4 space-y-2.5">
         {sidebarPages.map((key) => {
           const item = pages[key];
           const Icon = item.icon;
@@ -254,12 +254,12 @@ function Sidebar({ currentPage, setCurrentPage }) {
               key={key}
               onClick={() => setCurrentPage(key)}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-4 rounded-[24px] transition-all text-left border",
-                active ? "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-800 shadow-md" : "bg-white text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 border-slate-200"
+                "w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left border",
+                active ? "bg-slate-900 text-white border-slate-900 shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 border-transparent"
               )}
             >
               <Icon className="h-6 w-6" />
-              <span className="font-semibold text-[17px]">{item.label}</span>
+              <span className="font-medium text-[15px]">{item.label}</span>
             </button>
           );
         })}
@@ -289,12 +289,12 @@ function Topbar({
 }) {
   const mobilePages = ["dashboard", "stock", "maintenance", "attendance", "history"];
   return (
-    <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-      <div className="px-5 md:px-10 py-5 flex flex-col gap-5">
+    <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_24px_rgba(15,23,42,0.04)]">
+      <div className="px-5 md:px-8 py-4 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h2 className="text-3xl md:text-[2.3rem] font-extrabold tracking-tight text-slate-900">NERO CONSTRUÇÕES</h2>
-            <div className="mt-3 grid grid-cols-1 lg:grid-cols-[1fr_auto_auto_auto] gap-3 max-w-5xl">
+            <h2 className="text-[1.75rem] md:text-[2rem] font-semibold tracking-tight text-slate-900">NERO CONSTRUÇÕES</h2>
+            <div className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(320px,540px)_auto_auto_auto] gap-2.5 max-w-none">
               <SelectField
                 value={String(obraId || "")}
                 onChange={(value) => setObraId(value)}
@@ -307,11 +307,11 @@ function Topbar({
           </div>
           <div className="hidden md:flex items-center gap-3 flex-wrap justify-end">
             {connectionBadge}
-            <Badge className="bg-white text-slate-700 border-slate-300 text-base px-5 h-11 rounded-full"><Calendar className="h-4 w-4 mr-2" /> {getTodayBR()}</Badge>
+            <Badge className="bg-white text-slate-700 border-slate-300 text-sm px-4 h-10 rounded-full"><Calendar className="h-4 w-4 mr-2" /> {getTodayBR()}</Badge>
             {currentPage === "dashboard" ? (
               <>
-                <Button variant="outline" className="rounded-full px-6 h-12" onClick={onCloseDay}>Fechar dia</Button>
-                <Button variant="outline" className="rounded-full px-7 h-12" onClick={onReset}>Resetar base</Button>
+                <Button variant="outline" className="rounded-xl px-4 h-10" onClick={onCloseDay}>Fechar dia</Button>
+                <Button variant="outline" className="rounded-xl px-4 h-10" onClick={onReset}>Resetar base</Button>
               </>
             ) : null}
           </div>
@@ -322,8 +322,8 @@ function Topbar({
               key={page}
               onClick={() => setCurrentPage(page)}
               className={cn(
-                "h-11 rounded-2xl border text-sm font-medium transition-colors",
-                currentPage === page ? "bg-emerald-800 text-white border-emerald-800" : "bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-200"
+                "h-10 rounded-xl border text-sm font-medium transition-colors",
+                currentPage === page ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
               )}
             >
               {pages[page].label}
@@ -337,15 +337,15 @@ function Topbar({
 
 function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-[26px] border p-5 transition-all duration-300 bg-gradient-to-br from-white to-slate-50 shadow-md hover:shadow-xl hover:-translate-y-1", alert ? "border-rose-200" : "border-slate-200")}>
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-100/40 pointer-events-none" />
+    <div className={cn("relative overflow-hidden rounded-[20px] border p-4 transition-all duration-300 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]", alert ? "border-rose-200" : "border-slate-200")}>
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
       <div className="relative flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">{title}</p>
-          <p className="text-4xl font-extrabold text-slate-900 mt-2">{value}</p>
-          <p className="text-sm text-slate-500 mt-2">{subtitle}</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400 font-semibold">{title}</p>
+          <p className="text-3xl font-semibold text-slate-900 mt-2">{value}</p>
+          <p className="text-sm text-slate-500 mt-1.5">{subtitle}</p>
         </div>
-        <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner", alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700")}><Icon className="h-5 w-5" /></div>
+        <div className={cn("absolute top-4 right-4 h-10 w-10 rounded-xl flex items-center justify-center", alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700")}><Icon className="h-5 w-5" /></div>
       </div>
     </div>
   );
@@ -353,9 +353,9 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
 
 function QuickActionCard({ icon: Icon, title, subtitle, onClick }) {
   return (
-    <button onClick={onClick} className="text-left rounded-[24px] border border-slate-200 p-4 transition-all duration-300 bg-white hover:-translate-y-0.5 hover:shadow-lg hover:border-emerald-300 hover:bg-emerald-50/40">
+    <button onClick={onClick} className="text-left rounded-[20px] border border-slate-200 p-4 transition-all duration-300 bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 hover:bg-slate-50">
       <div className="flex items-start gap-3">
-        <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-slate-100 text-slate-700"><Icon className="h-5 w-5" /></div>
+        <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-slate-100 text-slate-700"><Icon className="h-5 w-5" /></div>
         <div className="min-w-0"><p className="font-semibold text-slate-900">{title}</p><p className="text-sm text-slate-500 mt-1">{subtitle}</p></div>
       </div>
     </button>
@@ -373,34 +373,34 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
 
   return (
-    <div className="space-y-8">
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+    <div className="space-y-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <HomeStatCard title="Manutenções abertas" value={pendingCount} subtitle="Aguardando entrega" icon={Clock3} />
         <HomeStatCard title="Manutenções atrasadas" value={delayedCount} subtitle="Prazo ultrapassado" icon={AlertTriangle} alert={delayedCount > 0} />
         <HomeStatCard title="Itens críticos" value={criticalStock} subtitle="Abaixo do mínimo" icon={Package} alert={criticalStock > 0} />
         <HomeStatCard title="Total presente" value={totalPresent} subtitle="Equipe somada na obra" icon={Users} />
       </section>
 
-      <Card className="overflow-hidden shadow-xl">
-        <div className="p-6 md:p-7 bg-gradient-to-r from-slate-900 via-emerald-900 to-slate-900 text-white">
+      <Card className="overflow-hidden shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+        <div className="p-6 md:p-7 bg-white text-slate-900">
           <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
             <div className="max-w-3xl">
-              <p className="text-xs uppercase tracking-[0.24em] text-emerald-200 font-semibold">Central operacional</p>
-              <h3 className="text-2xl md:text-3xl font-extrabold mt-2 tracking-tight">{obraAtual?.nome || "Selecione uma obra"}</h3>
-              <p className="text-sm md:text-base text-slate-200/90 mt-3">Cliente: <span className="font-semibold">{obraAtual?.cliente || "-"}</span></p>
-              <p className="text-sm md:text-base text-slate-200/90 mt-2">Local: <span className="font-semibold">{obraAtual?.local || "-"}</span></p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-semibold">Central operacional</p>
+              <h3 className="text-2xl md:text-[2rem] font-semibold mt-2 tracking-tight">{obraAtual?.nome || "Selecione uma obra"}</h3>
+              <p className="text-sm md:text-base text-slate-600 mt-3">Cliente: <span className="font-semibold">{obraAtual?.cliente || "-"}</span></p>
+              <p className="text-sm md:text-base text-slate-600 mt-2">Local: <span className="font-semibold">{obraAtual?.local || "-"}</span></p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:w-auto">
-              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Empresas</p><p className="text-2xl font-bold mt-1">{data.companies.length}</p></div>
-              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Materiais</p><p className="text-2xl font-bold mt-1">{data.stock.length}</p></div>
-              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">OS</p><p className="text-2xl font-bold mt-1">{data.maintenance.length}</p></div>
-              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Históricos</p><p className="text-2xl font-bold mt-1">{historyCountForObra}</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Empresas</p><p className="text-xl font-semibold mt-1 text-slate-900">{data.companies.length}</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Materiais</p><p className="text-xl font-semibold mt-1 text-slate-900">{data.stock.length}</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">OS</p><p className="text-xl font-semibold mt-1 text-slate-900">{data.maintenance.length}</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Históricos</p><p className="text-xl font-semibold mt-1 text-slate-900">{historyCountForObra}</p></div>
             </div>
           </div>
         </div>
       </Card>
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <QuickActionCard icon={Package} title="Almoxarifado" subtitle="Consulta e cadastro de materiais" onClick={onGoToStock} />
         <QuickActionCard icon={Wrench} title="Manutenções" subtitle="OS, prazo, status e atraso" onClick={onGoToMaintenance} />
         <QuickActionCard icon={Users} title="Presença" subtitle="Lançamento em lote por função" onClick={onGoToAttendance} />
@@ -421,7 +421,7 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm text-slate-500">{item.category}</p>
-                  <h3 className="text-lg font-semibold text-slate-900 mt-1">{item.item}</h3>
+                  <h3 className="text-base font-semibold text-slate-900 mt-1">{item.item}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Estoque mínimo" : "Normal"}</Badge>
@@ -695,7 +695,7 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
     <div className="space-y-6">
       <Card><CardHeader title="Histórico diário" description={obraAtual ? `Dias fechados da obra: ${obraAtual.nome}` : "Selecione uma obra"} right={<ReturnHomeButton onClick={onBack} />} /></Card>
       {!history.length ? (
-        <Card><div className="p-8 text-center"><p className="text-lg font-semibold text-slate-900">Nenhum dia fechado ainda para esta obra.</p><p className="text-sm text-slate-500 mt-2">Use o botão “Fechar dia” no dashboard.</p></div></Card>
+        <Card><div className="p-8 text-center"><p className="text-lg font-semibold text-slate-900">Nenhum dia fechado ainda para esta obra.</p><p className="text-sm text-slate-500 mt-1.5">Use o botão “Fechar dia” no dashboard.</p></div></Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {history.map((day) => (
@@ -1053,8 +1053,8 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="flex min-h-screen">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1540px]">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
         <div className="flex-1 min-w-0">
           <Topbar
@@ -1073,13 +1073,13 @@ export default function App() {
 
           <input id="backup-input" type="file" accept=".json,application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importBackupFromFile(e.target.files[0])} />
 
-          {errorMessage ? <div className="px-6 md:px-12 pt-6"><div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div></div> : null}
+          {errorMessage ? <div className="px-5 md:px-8 pt-5"><div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">{errorMessage}</div></div> : null}
 
-          <main className="px-6 md:px-12 py-8 md:py-10">
+          <main className="px-5 md:px-8 py-6 md:py-8">
             {loading ? (
-              <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
-                <p className="text-lg font-semibold text-slate-900">Carregando dados...</p>
-                <p className="text-sm text-slate-500 mt-2">Aguarde a sincronização do sistema.</p>
+              <div className="rounded-[22px] border border-slate-200 bg-white p-8 text-center shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
+                <p className="text-base font-semibold text-slate-900">Carregando dados...</p>
+                <p className="text-sm text-slate-500 mt-1.5">Aguarde a sincronização do sistema.</p>
               </div>
             ) : (
               <AnimatePresence mode="wait">
