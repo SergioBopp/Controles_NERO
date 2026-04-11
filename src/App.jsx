@@ -229,10 +229,18 @@ function LogoBlock() {
         <div className="hidden h-full w-full items-center justify-center bg-gradient-to-r from-emerald-700 to-emerald-800 text-white text-3xl font-bold">N</div>
       </div>
       <div>
-        <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sistema Web</p>
-        <h1 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-2">NERO</h1>
-        <h2 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-1">CONSTRUÇÕES</h2>
-      </div>
+  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+    SISTEMA WEB
+  </p>
+
+  <h1 className="text-[1.65rem] font-semibold tracking-tight text-white leading-none mt-2 uppercase">
+    NERO
+  </h1>
+
+  <h2 className="text-[1.65rem] font-semibold tracking-tight text-white leading-none mt-1 uppercase">
+    CONSTRUÇÕES
+  </h2>
+</div>>
     </div>
   );
 }
