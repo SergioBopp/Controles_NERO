@@ -240,8 +240,8 @@ function LogoBlock() {
 function Sidebar({ currentPage, setCurrentPage }) {
   const sidebarPages = ["dashboard", "stock", "maintenance", "attendance", "history"];
   return (
-    <aside className="hidden md:flex md:w-72 lg:w-[290px] border-r border-slate-200 bg-white flex-col">
-      <div className="px-6 py-6 border-b border-slate-200 bg-white">
+    <aside className="hidden md:flex md:w-72 lg:w-[290px] border-r border-emerald-900/40 bg-gradient-to-b from-emerald-800 via-emerald-900 to-emerald-950 flex-col text-white">
+      <div className="px-6 py-6 border-b border-white/10 bg-transparent">
         <LogoBlock />
       </div>
       <nav className="flex-1 p-4 space-y-2.5">
@@ -255,7 +255,7 @@ function Sidebar({ currentPage, setCurrentPage }) {
               onClick={() => setCurrentPage(key)}
               className={cn(
                 "w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all text-left border",
-                active ? "bg-slate-900 text-white border-slate-900 shadow-sm" : "bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 border-transparent"
+                active ? "bg-white text-emerald-900 border-white shadow-sm" : "bg-white/5 text-emerald-50 hover:bg-white/10 hover:border-white/20 border-transparent"
               )}
             >
               <Icon className="h-6 w-6" />
@@ -442,7 +442,7 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete }) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
@@ -509,7 +509,10 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete }) 
                     </td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap font-semibold">{atraso}</td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
-                      <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onEdit(item)}>Editar</Button>
+                        <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -750,7 +753,7 @@ export default function App() {
   const [roleForm, setRoleForm] = useState({ companyId: "", name: "" });
   const [obraForm, setObraForm] = useState({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   const [stockForm, setStockForm] = useState({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
-  const [maintenanceForm, setMaintenanceForm] = useState({
+  const createEmptyMaintenanceForm = () => ({
     os: "",
     service: "",
     requester: "",
@@ -761,6 +764,8 @@ export default function App() {
     limitDate: addDaysISO(getTodayISO(), 7),
     responsible: "",
   });
+  const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
+  const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
 
   const obraAtual = useMemo(() => data.obras.find((obra) => sameId(obra.id, obraId)) || null, [data.obras, obraId]);
 
@@ -930,17 +935,68 @@ export default function App() {
     setStockForm({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
   }
 
+  function closeMaintenanceModal() {
+    setMaintenanceModal(false);
+    setEditingMaintenanceId("");
+    setMaintenanceForm(createEmptyMaintenanceForm());
+  }
+
+  function openNewMaintenanceModal() {
+    setEditingMaintenanceId("");
+    setMaintenanceForm(createEmptyMaintenanceForm());
+    setMaintenanceModal(true);
+  }
+
+  function openMaintenanceEditor(item) {
+    setEditingMaintenanceId(item.id);
+    setMaintenanceForm({
+      os: item.os || "",
+      service: item.service || "",
+      requester: item.requester || "",
+      requestDate: item.requestDate || getTodayISO(),
+      realizationDate: item.realizationDate || "",
+      deliveryDate: item.deliveryDate || "",
+      cost: item.cost || 0,
+      limitDate: item.limitDate || addDaysISO(getTodayISO(), 7),
+      responsible: item.responsible || "",
+    });
+    setMaintenanceModal(true);
+  }
+
   async function addMaintenanceOrder() {
-    const payload = { id: generateId(), obraId, ...maintenanceForm };
+    const payload = { id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("maintenance_orders").insert({ id: payload.id, obra_id: payload.obraId, os: payload.os, service: payload.service, requester: payload.requester, request_date: payload.requestDate, realization_date: payload.realizationDate || null, delivery_date: payload.deliveryDate || null, cost: Number(payload.cost), limit_date: payload.limitDate, responsible: payload.responsible });
-      if (error) return setErrorMessage(error.message);
+      if (editingMaintenanceId) {
+        const { error } = await supabase
+          .from("maintenance_orders")
+          .update({
+            obra_id: payload.obraId,
+            os: payload.os,
+            service: payload.service,
+            requester: payload.requester,
+            request_date: payload.requestDate,
+            realization_date: payload.realizationDate || null,
+            delivery_date: payload.deliveryDate || null,
+            cost: Number(payload.cost),
+            limit_date: payload.limitDate,
+            responsible: payload.responsible,
+          })
+          .eq("id", editingMaintenanceId);
+        if (error) return setErrorMessage(error.message);
+      } else {
+        const { error } = await supabase.from("maintenance_orders").insert({ id: payload.id, obra_id: payload.obraId, os: payload.os, service: payload.service, requester: payload.requester, request_date: payload.requestDate, realization_date: payload.realizationDate || null, delivery_date: payload.deliveryDate || null, cost: Number(payload.cost), limit_date: payload.limitDate, responsible: payload.responsible });
+        if (error) return setErrorMessage(error.message);
+      }
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, maintenance: [...prev.maintenance, payload] }));
+      setData((prev) => ({
+        ...prev,
+        maintenance: editingMaintenanceId
+          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? { ...item, ...payload } : item)
+          : [...prev.maintenance, payload],
+      }));
     }
-    setMaintenanceModal(false);
-    setMaintenanceForm({ os: "", service: "", requester: "", requestDate: getTodayISO(), realizationDate: "", deliveryDate: "", cost: 0, limitDate: addDaysISO(getTodayISO(), 7), responsible: "" });
+    closeMaintenanceModal();
   }
 
   async function deleteCompany(id) {
@@ -1086,7 +1142,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={() => setMaintenanceModal(true)} onDelete={deleteMaintenanceOrder} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -1181,7 +1237,7 @@ export default function App() {
         <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setStockModal(false)}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
       </Modal>
 
-      <Modal open={maintenanceModal} title="Nova manutenção" onClose={() => setMaintenanceModal(false)}>
+      <Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={closeMaintenanceModal}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
           <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
@@ -1193,7 +1249,7 @@ export default function App() {
           <Field label="Data limite"><Input type="date" value={maintenanceForm.limitDate} readOnly /></Field>
           <Field label="Responsável"><Input value={maintenanceForm.responsible} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setMaintenanceModal(false)}>Cancelar</Button><Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !obraAtual}>Salvar</Button></div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={closeMaintenanceModal}>Cancelar</Button><Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !obraAtual}>{editingMaintenanceId ? "Salvar alterações" : "Salvar"}</Button></div>
       </Modal>
     </div>
   );
