@@ -335,15 +335,38 @@ function Topbar({
   );
 }
 
-function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
+function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "default" }) {
+  const toneStyles = {
+    default: {
+      border: alert ? "border-rose-200" : "border-slate-200",
+      icon: alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700",
+      value: "text-slate-900",
+      glow: "to-slate-50/60",
+    },
+    success: {
+      border: "border-emerald-200",
+      icon: "bg-emerald-100 text-emerald-700",
+      value: "text-emerald-700",
+      glow: "to-emerald-50/70",
+    },
+    danger: {
+      border: "border-rose-200",
+      icon: "bg-rose-100 text-rose-700",
+      value: "text-rose-700",
+      glow: "to-rose-50/70",
+    },
+  };
+
+  const styles = toneStyles[tone] || toneStyles.default;
+
   return (
     <div
       className={cn(
         "relative overflow-hidden rounded-[22px] border bg-white p-5 transition-all duration-300 shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]",
-        alert ? "border-rose-200" : "border-slate-200"
+        styles.border
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
+      <div className={cn("absolute inset-0 bg-gradient-to-br from-transparent via-transparent pointer-events-none", styles.glow)} />
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -353,14 +376,14 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
           <div
             className={cn(
               "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-              alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700"
+              styles.icon
             )}
           >
             <Icon className="h-5 w-5" />
           </div>
         </div>
 
-        <p className="mt-5 text-[2.2rem] font-bold leading-none tracking-tight text-slate-900">
+        <p className={cn("mt-5 text-[2.2rem] font-bold leading-none tracking-tight", styles.value)}>
           {value}
         </p>
 
@@ -470,7 +493,11 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
     delivered: items.filter((item) => getMaintenanceStatus(item) === "Entregue").length,
+    totalCost: items.reduce((acc, item) => acc + Number(item.cost || item.estimated_cost || 0), 0),
   };
+
+  const totalCostTone = summary.totalCost > 0 ? "danger" : "success";
+  const totalCostSubtitle = summary.totalCost > 0 ? "Total geral das OS" : "Sem custo lançado nas OS";
 
   return (
     <div className="space-y-6">
@@ -491,10 +518,11 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
         />
       </Card>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <HomeStatCard title="OS abertas" value={summary.open} subtitle="Ainda sem entrega" icon={Clock3} />
         <HomeStatCard title="OS atrasadas" value={summary.delayed} subtitle="Prazo excedido" icon={AlertTriangle} alert={summary.delayed > 0} />
         <HomeStatCard title="OS entregues" value={summary.delivered} subtitle="Serviços concluídos" icon={FileText} />
+        <HomeStatCard title="Valor total" value={formatCurrencyBR(summary.totalCost)} subtitle={totalCostSubtitle} icon={Briefcase} tone={totalCostTone} />
       </section>
 
       <Card className="overflow-hidden">
