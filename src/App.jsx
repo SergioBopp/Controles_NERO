@@ -344,27 +344,29 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 pr-2">
+      <div className="relative">
+        <div className="flex items-start justify-between gap-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             {title}
           </p>
-          <p className="mt-3 text-[2.35rem] font-bold leading-none tracking-tight text-slate-900">
-            {value}
-          </p>
-          <p className="mt-3 text-sm text-slate-500">
-            {subtitle}
-          </p>
+
+          <div
+            className={cn(
+              "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+              alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700"
+            )}
+          >
+            <Icon className="h-5 w-5" />
+          </div>
         </div>
 
-        <div
-          className={cn(
-            "mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
-            alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700"
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
+        <p className="mt-5 text-[2.2rem] font-bold leading-none tracking-tight text-slate-900">
+          {value}
+        </p>
+
+        <p className="mt-4 text-sm leading-snug text-slate-500">
+          {subtitle}
+        </p>
       </div>
     </div>
   );
