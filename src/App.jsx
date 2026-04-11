@@ -371,14 +371,16 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
   const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
+  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.cost || item.estimated_cost || 0), 0);
 
   return (
     <div className="space-y-6">
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <HomeStatCard title="Manutenções abertas" value={pendingCount} subtitle="Aguardando entrega" icon={Clock3} />
         <HomeStatCard title="Manutenções atrasadas" value={delayedCount} subtitle="Prazo ultrapassado" icon={AlertTriangle} alert={delayedCount > 0} />
         <HomeStatCard title="Itens críticos" value={criticalStock} subtitle="Abaixo do mínimo" icon={Package} alert={criticalStock > 0} />
         <HomeStatCard title="Total presente" value={totalPresent} subtitle="Equipe somada na obra" icon={Users} />
+        <HomeStatCard title="Custo total" value={formatCurrencyBR(totalMaintenanceCost)} subtitle="Total das OS da obra" icon={Briefcase} />
       </section>
 
       <Card className="overflow-hidden shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
