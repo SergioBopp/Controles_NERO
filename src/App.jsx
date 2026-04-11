@@ -231,7 +231,7 @@ function LogoBlock() {
       <div>
         <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sistema Web</p>
         <h1 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-2">NERO</h1>
-        <h2 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-1">Construções</h2>
+        <h2 className="text-[1.65rem] font-semibold tracking-tight text-slate-900 leading-none mt-1">CONSTRUÇÕES</h2>
       </div>
     </div>
   );
