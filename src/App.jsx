@@ -345,11 +345,11 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
     >
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
       <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pr-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             {title}
           </p>
-          <p className="mt-3 text-[2.5rem] font-bold leading-none tracking-tight text-slate-900">
+          <p className="mt-3 text-[2.35rem] font-bold leading-none tracking-tight text-slate-900">
             {value}
           </p>
           <p className="mt-3 text-sm text-slate-500">
@@ -359,11 +359,11 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
 
         <div
           className={cn(
-            "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
-            alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700"
+            "mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+            alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700"
           )}
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>
