@@ -23,34 +23,6 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 
 const LOGO_SRC = "/logo-nero.png";
 
-const LOCAL_DATA_KEY = "nero_local_data_v2";
-const LOCAL_SELECTED_OBRA_KEY = "nero_local_selected_obra_v2";
-const LOCAL_ONLINE_MODE_KEY = "nero_online_mode_v2";
-
-function readStoredLocalData() {
-  if (typeof window === "undefined") return initialData;
-  try {
-    const raw = window.localStorage.getItem(LOCAL_DATA_KEY);
-    if (!raw) return initialData;
-    const parsed = JSON.parse(raw);
-    return parsed?.obras ? parsed : initialData;
-  } catch {
-    return initialData;
-  }
-}
-
-function readStoredSelectedObra() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(LOCAL_SELECTED_OBRA_KEY) || "";
-}
-
-function readStoredOnlineMode() {
-  if (typeof window === "undefined") return isSupabaseConfigured;
-  const raw = window.localStorage.getItem(LOCAL_ONLINE_MODE_KEY);
-  if (raw === null) return isSupabaseConfigured;
-  return raw === "true";
-}
-
 const initialData = {
   obras: [
     { id: 101, nome: "Obra Principal", cliente: "NERO Construções", local: "Salvador/BA", status: "Ativa", dataInicio: "2026-04-01", observacao: "" },
@@ -113,6 +85,15 @@ function getDateTimeBRNoSeconds() {
 
 function generateId() {
   return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function generateUuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `uuid-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+}
+
+function sameId(a, b) {
+  return String(a ?? "") === String(b ?? "");
 }
 
 function addDaysISO(dateString, days) {
@@ -198,10 +179,6 @@ function Input({ className = "", ...props }) {
   return <input className={cn("w-full rounded-2xl border border-slate-300 bg-white px-4 h-11 text-sm outline-none focus:border-emerald-500", className)} {...props} />;
 }
 
-function Textarea({ className = "", ...props }) {
-  return <textarea className={cn("w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500 min-h-[120px] resize-y", className)} {...props} />;
-}
-
 function SelectField({ value, onChange, options, className = "" }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={cn("w-full rounded-2xl border border-slate-300 bg-white px-4 h-11 text-sm outline-none focus:border-emerald-500", className)}>
@@ -263,8 +240,8 @@ function LogoBlock() {
 function Sidebar({ currentPage, setCurrentPage }) {
   const sidebarPages = ["dashboard", "stock", "maintenance", "attendance", "history"];
   return (
-    <aside className="hidden md:flex md:w-[260px] lg:w-[280px] border-r border-slate-200 bg-gradient-to-b from-slate-50 to-slate-200 flex-col">
-      <div className="px-6 py-7 border-b border-slate-200 bg-gradient-to-b from-emerald-50/70 to-white">
+    <aside className="hidden md:flex md:w-80 lg:w-[320px] border-r border-slate-200 bg-gradient-to-b from-slate-50 to-slate-200 flex-col">
+      <div className="px-7 py-8 border-b border-slate-200 bg-gradient-to-b from-emerald-50/70 to-white">
         <LogoBlock />
       </div>
       <nav className="flex-1 p-5 space-y-3">
@@ -313,11 +290,11 @@ function Topbar({
   const mobilePages = ["dashboard", "stock", "maintenance", "attendance", "history"];
   return (
     <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-      <div className="px-4 md:px-6 xl:px-7 py-4 flex flex-col gap-4">
+      <div className="px-5 md:px-10 py-5 flex flex-col gap-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h2 className="text-[2rem] md:text-[2.45rem] font-extrabold tracking-tight text-slate-900">NERO CONSTRUÇÕES</h2>
-            <div className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(420px,620px)_auto_auto_auto] gap-3 max-w-none">
+            <h2 className="text-3xl md:text-[2.3rem] font-extrabold tracking-tight text-slate-900">NERO CONSTRUÇÕES</h2>
+            <div className="mt-3 grid grid-cols-1 lg:grid-cols-[1fr_auto_auto_auto] gap-3 max-w-5xl">
               <SelectField
                 value={String(obraId || "")}
                 onChange={(value) => setObraId(value)}
@@ -358,36 +335,17 @@ function Topbar({
   );
 }
 
-function HomeStatCard({ title, value, subtitle, icon: Icon, alert, valueClassName = "" }) {
+function HomeStatCard({ title, value, subtitle, icon: Icon, alert }) {
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-[26px] border border-slate-200 bg-white px-5 py-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
-        alert && "border-rose-200"
-      )}
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-100/35 pointer-events-none" />
-      <div
-        className={cn(
-          "absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl shadow-inner",
-          alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700"
-        )}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="relative min-h-[148px] pr-16 flex flex-col justify-end">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
-          <p
-            className={cn(
-              "mt-3 text-[1.8rem] md:text-[2.2rem] font-bold leading-none tracking-tight text-slate-900",
-              valueClassName
-            )}
-          >
-            {value}
-          </p>
-          <p className="mt-3 text-sm text-slate-500">{subtitle}</p>
+    <div className={cn("relative overflow-hidden rounded-[26px] border p-5 transition-all duration-300 bg-gradient-to-br from-white to-slate-50 shadow-md hover:shadow-xl hover:-translate-y-1", alert ? "border-rose-200" : "border-slate-200")}>
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-100/40 pointer-events-none" />
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">{title}</p>
+          <p className="text-4xl font-extrabold text-slate-900 mt-2">{value}</p>
+          <p className="text-sm text-slate-500 mt-2">{subtitle}</p>
         </div>
+        <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner", alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50 text-emerald-700")}><Icon className="h-5 w-5" /></div>
       </div>
     </div>
   );
@@ -408,123 +366,41 @@ function ReturnHomeButton({ onClick }) {
   return <Button variant="outline" onClick={onClick}><ArrowLeft className="h-4 w-4" /> Página inicial</Button>;
 }
 
-
 function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToHistory }) {
   const pendingCount = data.maintenance.filter((item) => getMaintenanceStatus(item) !== "Entregue").length;
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
-  const deliveredCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Entregue").length;
   const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
-  const totalMaintenance = data.maintenance.length;
-  const completionPercent = totalMaintenance ? Math.round((deliveredCount / totalMaintenance) * 100) : 0;
-  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.cost || 0), 0);
 
   return (
-    <div className="space-y-6">
-      <Card className="overflow-hidden border border-slate-200 shadow-xl">
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 md:p-6 text-white">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
-              <div className="max-w-3xl">
-                <p className="text-xs uppercase tracking-[0.24em] text-emerald-200 font-semibold">Central operacional</p>
-                <h3 className="text-[1.85rem] md:text-[2.05rem] font-extrabold mt-2 tracking-tight">{obraAtual?.nome || "Selecione uma obra"}</h3>
-                <p className="text-sm md:text-base text-slate-200/90 mt-3">
-                  Cliente: <span className="font-semibold">{obraAtual?.cliente || "-"}</span>
-                </p>
-                <p className="text-sm md:text-base text-slate-200/90 mt-2">
-                  Local: <span className="font-semibold">{obraAtual?.local || "-"}</span>
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:w-auto">
-                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
-                  <p className="text-xs text-slate-300">Empresas</p>
-                  <p className="text-xl md:text-2xl font-bold mt-1">{data.companies.length}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
-                  <p className="text-xs text-slate-300">Materiais</p>
-                  <p className="text-xl md:text-2xl font-bold mt-1">{data.stock.length}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
-                  <p className="text-xs text-slate-300">OS</p>
-                  <p className="text-xl md:text-2xl font-bold mt-1">{totalMaintenance}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
-                  <p className="text-xs text-slate-300">Históricos</p>
-                  <p className="text-xl md:text-2xl font-bold mt-1">{historyCountForObra}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
-              <div className="rounded-[24px] border border-white/10 bg-white/10 p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Status</p>
-                    <p className="mt-1 text-sm md:text-base font-semibold text-emerald-200">{obraAtual?.status || "Ativa"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">OS abertas</p>
-                    <p className="mt-1 text-sm md:text-base font-semibold">{pendingCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">OS entregues</p>
-                    <p className="mt-1 text-sm md:text-base font-semibold">{deliveredCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Custo acumulado</p>
-                    <p className="mt-1 text-sm md:text-base font-semibold">{formatCurrencyBR(totalMaintenanceCost)}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between text-xs text-slate-300">
-                    <span>Progresso das OS</span>
-                    <span>{completionPercent}%</span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-white/15 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-emerald-300 transition-all duration-500"
-                      style={{ width: `${completionPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-white/10 bg-white/10 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Indicador executivo</p>
-                {delayedCount > 0 ? (
-                  <div className="mt-3 rounded-2xl border border-rose-300/30 bg-rose-200/10 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-200/15 text-rose-200">
-                        <AlertTriangle className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-rose-100">Existem {delayedCount} OS atrasadas nesta obra</p>
-                        <p className="mt-1 text-sm text-slate-200/80">Acompanhe os prazos para evitar impacto operacional.</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 rounded-2xl border border-emerald-300/20 bg-emerald-200/10 p-4">
-                    <p className="text-sm font-semibold text-emerald-100">Nenhuma OS atrasada nesta obra.</p>
-                    <p className="mt-1 text-sm text-slate-200/80">O cronograma está sob controle no momento.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="space-y-8">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <HomeStatCard title="Manutenções abertas" value={pendingCount} subtitle="Aguardando entrega" icon={Clock3} />
         <HomeStatCard title="Manutenções atrasadas" value={delayedCount} subtitle="Prazo ultrapassado" icon={AlertTriangle} alert={delayedCount > 0} />
         <HomeStatCard title="Itens críticos" value={criticalStock} subtitle="Abaixo do mínimo" icon={Package} alert={criticalStock > 0} />
         <HomeStatCard title="Total presente" value={totalPresent} subtitle="Equipe somada na obra" icon={Users} />
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <Card className="overflow-hidden shadow-xl">
+        <div className="p-6 md:p-7 bg-gradient-to-r from-slate-900 via-emerald-900 to-slate-900 text-white">
+          <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.24em] text-emerald-200 font-semibold">Central operacional</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold mt-2 tracking-tight">{obraAtual?.nome || "Selecione uma obra"}</h3>
+              <p className="text-sm md:text-base text-slate-200/90 mt-3">Cliente: <span className="font-semibold">{obraAtual?.cliente || "-"}</span></p>
+              <p className="text-sm md:text-base text-slate-200/90 mt-2">Local: <span className="font-semibold">{obraAtual?.local || "-"}</span></p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:w-auto">
+              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Empresas</p><p className="text-2xl font-bold mt-1">{data.companies.length}</p></div>
+              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Materiais</p><p className="text-2xl font-bold mt-1">{data.stock.length}</p></div>
+              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">OS</p><p className="text-2xl font-bold mt-1">{data.maintenance.length}</p></div>
+              <div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-3"><p className="text-xs text-slate-300">Históricos</p><p className="text-2xl font-bold mt-1">{historyCountForObra}</p></div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <QuickActionCard icon={Package} title="Almoxarifado" subtitle="Consulta e cadastro de materiais" onClick={onGoToStock} />
         <QuickActionCard icon={Wrench} title="Manutenções" subtitle="OS, prazo, status e atraso" onClick={onGoToMaintenance} />
         <QuickActionCard icon={Users} title="Presença" subtitle="Lançamento em lote por função" onClick={onGoToAttendance} />
@@ -566,26 +442,11 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-function MaintenancePage({
-  items,
-  search,
-  setSearch,
-  statusFilter,
-  setStatusFilter,
-  responsibleFilter,
-  setResponsibleFilter,
-  responsibleOptions,
-  onViewObservation,
-  onBack,
-  onAdd,
-  onDelete,
-  onEdit,
-}) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
     delivered: items.filter((item) => getMaintenanceStatus(item) === "Entregue").length,
-    totalCost: items.reduce((acc, item) => acc + Number(item.cost || 0), 0),
   };
 
   return (
@@ -593,7 +454,7 @@ function MaintenancePage({
       <Card>
         <CardHeader
           title="Manutenções"
-          description="Controle de OS, prazos automáticos, status, atraso e observações"
+          description="Controle de OS, prazos automáticos, status e atraso"
           right={
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <div className="relative w-full sm:w-80">
@@ -607,60 +468,18 @@ function MaintenancePage({
         />
       </Card>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <HomeStatCard title="OS abertas" value={summary.open} subtitle="Ainda sem entrega" icon={Clock3} />
         <HomeStatCard title="OS atrasadas" value={summary.delayed} subtitle="Prazo excedido" icon={AlertTriangle} alert={summary.delayed > 0} />
         <HomeStatCard title="OS entregues" value={summary.delivered} subtitle="Serviços concluídos" icon={FileText} />
-        <HomeStatCard title="Custo total" value={formatCurrencyBR(summary.totalCost)} subtitle="Total das OS filtradas" icon={Briefcase} valueClassName="text-[1.55rem] md:text-[1.9rem]" />
       </section>
 
-      <Card>
-        <div className="p-4 md:p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Field label="Filtrar por status">
-            <SelectField
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { value: "todos", label: "Todos os status" },
-                { value: "No prazo", label: "No prazo" },
-                { value: "Atrasado", label: "Atrasado" },
-                { value: "Em execução", label: "Em execução" },
-                { value: "Entregue", label: "Entregue" },
-              ]}
-            />
-          </Field>
-          <Field label="Filtrar por responsável">
-            <SelectField
-              value={responsibleFilter}
-              onChange={setResponsibleFilter}
-              options={[
-                { value: "todos", label: "Todos os responsáveis" },
-                ...responsibleOptions.map((name) => ({ value: name, label: name })),
-              ]}
-            />
-          </Field>
-          <div className="flex items-end">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("todos");
-                setResponsibleFilter("todos");
-              }}
-            >
-              Limpar filtros
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="overflow-hidden shadow-md">
+      <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-100">
-                {["OS", "SERVIÇO", "SOLICITANTE", "DATA SOLICITAÇÃO", "DATA REALIZAÇÃO", "DATA ENTREGA", "CUSTO (R$)", "DATA LIMITE", "RESPONSÁVEL", "STATUS", "ATRASO", "OBSERVAÇÕES", "AÇÕES"].map((head) => (
+                {["OS", "SERVIÇO", "SOLICITANTE", "DATA SOLICITAÇÃO", "DATA REALIZAÇÃO", "DATA ENTREGA", "CUSTO (R$)", "DATA LIMITE", "RESPONSÁVEL", "STATUS", "ATRASO", "AÇÕES"].map((head) => (
                   <th key={head} className="border-b border-slate-200 px-4 py-3 text-left text-xs font-bold text-slate-900 whitespace-nowrap">{head}</th>
                 ))}
               </tr>
@@ -669,19 +488,18 @@ function MaintenancePage({
               {items.length ? items.map((item) => {
                 const status = getMaintenanceStatus(item);
                 const atraso = getDelayIndicator(item);
-                const delayed = status === "Atrasado";
                 return (
-                  <tr key={item.id} className={cn("transition-colors", delayed ? "bg-rose-50/70 hover:bg-rose-50" : "bg-white hover:bg-slate-50/80")}>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap font-semibold text-slate-800", delayed ? "border-rose-200 border-l-4 border-l-rose-500" : "border-slate-200")}>{item.os}</td>
-                    <td className={cn("border-b px-4 py-3 min-w-[260px]", delayed ? "border-rose-200" : "border-slate-200")}>{item.service}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{item.requester || "-"}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{formatDateBR(item.requestDate)}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{formatDateBR(item.realizationDate)}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{formatDateBR(item.deliveryDate)}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{formatCurrencyBR(item.cost)}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200 text-rose-700 font-semibold" : "border-slate-200")}>{formatDateBR(item.limitDate)}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>{item.responsible || "-"}</td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>
+                  <tr key={item.id} className="bg-white">
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.os}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 min-w-[220px]">{item.service}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.requester || "-"}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.requestDate)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.realizationDate)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.deliveryDate)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatCurrencyBR(item.cost)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.limitDate)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.responsible || "-"}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
                       <Badge className={
                         status === "Atrasado" ? "bg-rose-100 text-rose-700 border-rose-200" :
                         status === "Entregue" ? "bg-sky-100 text-sky-700 border-sky-200" :
@@ -689,25 +507,15 @@ function MaintenancePage({
                         "bg-emerald-100 text-emerald-700 border-emerald-200"
                       }>{status}</Badge>
                     </td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap font-semibold", delayed ? "border-rose-200 text-rose-700" : "border-slate-200")}>{atraso}</td>
-                    <td className={cn("border-b px-4 py-3 min-w-[180px]", delayed ? "border-rose-200" : "border-slate-200")}>
-                      {item.observacao ? (
-                        <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onViewObservation(item)}>Ver observação</Button>
-                      ) : (
-                        <span className="text-sm text-slate-400">Sem observações</span>
-                      )}
-                    </td>
-                    <td className={cn("border-b px-4 py-3 whitespace-nowrap", delayed ? "border-rose-200" : "border-slate-200")}>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onEdit(item)}>Editar</Button>
-                        <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
-                      </div>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap font-semibold">{atraso}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
+                      <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
                     </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan={13} className="px-4 py-6 text-center text-slate-500">Nenhuma manutenção cadastrada para esta obra.</td>
+                  <td colSpan={12} className="px-4 py-6 text-center text-slate-500">Nenhuma manutenção cadastrada para esta obra.</td>
                 </tr>
               )}
             </tbody>
@@ -717,7 +525,6 @@ function MaintenancePage({
     </div>
   );
 }
-
 
 function AttendancePage({ attendance, companies, roles, onBack, onAddPresence, onAddCompany, onAddRole, onDeletePresence, onDeleteCompany, onDeleteRole }) {
   const grouped = useMemo(() => {
@@ -922,11 +729,11 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
 }
 
 export default function App() {
-  const [data, setData] = useState(() => readStoredLocalData());
+  const [data, setData] = useState(initialData);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [search, setSearch] = useState("");
-  const [obraId, setObraId] = useState(() => readStoredSelectedObra() || readStoredLocalData().obras?.[0]?.id || "");
-  const [onlineMode, setOnlineMode] = useState(() => readStoredOnlineMode());
+  const [obraId, setObraId] = useState("");
+  const [onlineMode, setOnlineMode] = useState(isSupabaseConfigured);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -936,12 +743,6 @@ export default function App() {
   const [companyModal, setCompanyModal] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   const [obraModal, setObraModal] = useState(false);
-  const [editingMaintenanceId, setEditingMaintenanceId] = useState(null);
-  const [editingMaintenanceObraId, setEditingMaintenanceObraId] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [maintenanceStatusFilter, setMaintenanceStatusFilter] = useState("todos");
-  const [maintenanceResponsibleFilter, setMaintenanceResponsibleFilter] = useState("todos");
-  const [observationModalItem, setObservationModalItem] = useState(null);
 
   const [attendanceBatchCompanyId, setAttendanceBatchCompanyId] = useState("");
   const [attendanceBatchQuantities, setAttendanceBatchQuantities] = useState({});
@@ -959,20 +760,19 @@ export default function App() {
     cost: 0,
     limitDate: addDaysISO(getTodayISO(), 7),
     responsible: "",
-    observacao: "",
   });
 
-  const obraAtual = useMemo(() => data.obras.find((obra) => String(obra.id) === String(obraId)) || null, [data.obras, obraId]);
+  const obraAtual = useMemo(() => data.obras.find((obra) => sameId(obra.id, obraId)) || null, [data.obras, obraId]);
 
   const filteredData = useMemo(() => {
     if (!obraAtual) return { companies: data.companies, roles: data.roles, stock: [], maintenance: [], attendance: [], history: [] };
     return {
-      companies: data.companies.filter((item) => !item.obraId || String(item.obraId) === String(obraAtual.id)),
-      roles: data.roles.filter((item) => !item.obraId || String(item.obraId) === String(obraAtual.id)),
-      stock: data.stock.filter((item) => String(item.obraId) === String(obraAtual.id)),
-      maintenance: data.maintenance.filter((item) => String(item.obraId) === String(obraAtual.id)),
-      attendance: data.attendance.filter((item) => String(item.obraId) === String(obraAtual.id)),
-      history: data.history.filter((item) => String(item.obraId) === String(obraAtual.id)),
+      companies: data.companies.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
+      roles: data.roles.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
+      stock: data.stock.filter((item) => sameId(item.obraId, obraAtual.id)),
+      maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)),
+      attendance: data.attendance.filter((item) => sameId(item.obraId, obraAtual.id)),
+      history: data.history.filter((item) => sameId(item.obraId, obraAtual.id)),
     };
   }, [data, obraAtual]);
 
@@ -984,38 +784,15 @@ export default function App() {
     return Object.values(attendanceBatchQuantities).reduce((acc, value) => acc + Number(value || 0), 0);
   }, [attendanceBatchQuantities]);
 
-  const maintenanceResponsibleOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        filteredData.maintenance
-          .map((item) => (item.responsible || "").trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [filteredData.maintenance]);
-
   const filteredMaintenance = useMemo(() => {
-    return filteredData.maintenance.filter((item) => {
-      const haystack = [
-        item.os,
-        item.service,
-        item.requester,
-        item.responsible,
-        item.observacao,
-        getMaintenanceStatus(item),
-        getDelayIndicator(item),
-      ]
+    if (!search.trim()) return filteredData.maintenance;
+    return filteredData.maintenance.filter((item) =>
+      [item.os, item.service, item.requester, item.responsible, getMaintenanceStatus(item), getDelayIndicator(item)]
         .join(" ")
-        .toLowerCase();
-
-      const matchesSearch = !search.trim() || haystack.includes(search.toLowerCase());
-      const status = getMaintenanceStatus(item);
-      const matchesStatus = maintenanceStatusFilter === "todos" || status === maintenanceStatusFilter;
-      const matchesResponsible = maintenanceResponsibleFilter === "todos" || (item.responsible || "") === maintenanceResponsibleFilter;
-
-      return matchesSearch && matchesStatus && matchesResponsible;
-    });
-  }, [filteredData.maintenance, search, maintenanceStatusFilter, maintenanceResponsibleFilter]);
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+  }, [filteredData.maintenance, search]);
 
   async function fetchAllData() {
     if (!isSupabaseConfigured || !onlineMode) {
@@ -1043,16 +820,17 @@ export default function App() {
         companies: (companiesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, city: row.city })),
         roles: (rolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, name: row.name })),
         stock: (stockRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
-        maintenance: (maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service || row.title || "", requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible, observacao: row.observacao || "" })),
+        maintenance: (maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service, requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible })),
         attendance: (attendanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, roleId: row.role_id, qty: row.qty })),
         history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: row.snapshot?.maintenance || [], attendance: row.snapshot?.attendance || [] })),
       };
 
       setData(nextData);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(nextData));
-      }
-      if (!obraId && nextData.obras[0]) setObraId(nextData.obras[0].id);
+      setObraId((current) => {
+        const currentExists = nextData.obras.some((obra) => sameId(obra.id, current));
+        if (currentExists) return current;
+        return nextData.obras[0]?.id ?? "";
+      });
     } catch (error) {
       console.error(error);
       setErrorMessage("Não foi possível carregar os dados do Supabase. Confira as tabelas/colunas do script novo.");
@@ -1066,138 +844,56 @@ export default function App() {
     fetchAllData();
   }, [onlineMode]);
 
-  useEffect(() => {
-    if (!successMessage) return;
-    const timer = setTimeout(() => setSuccessMessage(""), 2600);
-    return () => clearTimeout(timer);
-  }, [successMessage]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(LOCAL_ONLINE_MODE_KEY, String(onlineMode));
-  }, [onlineMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (obraId) {
-      window.localStorage.setItem(LOCAL_SELECTED_OBRA_KEY, String(obraId));
-    } else {
-      window.localStorage.removeItem(LOCAL_SELECTED_OBRA_KEY);
-    }
-  }, [obraId]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (onlineMode) return;
-    window.localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-  }, [data, onlineMode]);
-
-
-  function resetMaintenanceForm() {
-    setMaintenanceForm({
-      os: "",
-      service: "",
-      requester: "",
-      requestDate: getTodayISO(),
-      realizationDate: "",
-      deliveryDate: "",
-      cost: 0,
-      limitDate: addDaysISO(getTodayISO(), 7),
-      responsible: "",
-      observacao: "",
-    });
-    setEditingMaintenanceId(null);
-    setEditingMaintenanceObraId("");
-  }
-
-  function openNewMaintenanceModal() {
-    resetMaintenanceForm();
-    setMaintenanceModal(true);
-  }
-
-  function openEditMaintenanceModal(item) {
-    setEditingMaintenanceId(item.id);
-    setEditingMaintenanceObraId(item.obraId);
-    setMaintenanceForm({
-      os: item.os || "",
-      service: item.service || "",
-      requester: item.requester || "",
-      requestDate: item.requestDate || getTodayISO(),
-      realizationDate: item.realizationDate || "",
-      deliveryDate: item.deliveryDate || "",
-      cost: item.cost ?? 0,
-      limitDate: item.limitDate || addDaysISO(item.requestDate || getTodayISO(), 7),
-      responsible: item.responsible || "",
-      observacao: item.observacao || "",
-    });
-    setMaintenanceModal(true);
-  }
-
-
   async function addObra() {
-    const payload = { ...obraForm };
+    const payload = { id: generateUuid(), ...obraForm };
     if (onlineMode && isSupabaseConfigured) {
-      const { data: insertedObra, error } = await supabase
-        .from("obras")
-        .insert({ nome: payload.nome, cliente: payload.cliente, local: payload.local, status: payload.status, data_inicio: payload.dataInicio, observacao: payload.observacao })
-        .select()
-        .single();
+      const { error } = await supabase.from("obras").insert({ id: payload.id, nome: payload.nome, cliente: payload.cliente, local: payload.local, status: payload.status, data_inicio: payload.dataInicio, observacao: payload.observacao });
       if (error) return setErrorMessage(error.message);
-      setErrorMessage("");
       await fetchAllData();
-      setObraId(insertedObra.id);
-      setSuccessMessage("Obra salva com sucesso.");
     } else {
-      const localPayload = { id: generateId(), ...payload };
-      setData((prev) => ({ ...prev, obras: [...prev.obras, localPayload] }));
-      setObraId(localPayload.id);
-      setSuccessMessage("Obra salva com sucesso.");
+      setData((prev) => ({ ...prev, obras: [...prev.obras, payload] }));
     }
+    setObraId(payload.id);
     setObraModal(false);
     setObraForm({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   }
 
   async function addCompany() {
-    const payload = { obraId, name: companyForm.name, city: companyForm.city };
+    const payload = { id: generateId(), obraId, name: companyForm.name, city: companyForm.city };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("companies").insert({ obra_id: payload.obraId, name: payload.name, city: payload.city });
+      const { error } = await supabase.from("companies").insert({ id: payload.id, obra_id: payload.obraId, name: payload.name, city: payload.city });
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
-      const localPayload = { id: generateId(), ...payload };
-      setData((prev) => ({ ...prev, companies: [...prev.companies, localPayload] }));
+      setData((prev) => ({ ...prev, companies: [...prev.companies, payload] }));
     }
     setCompanyModal(false);
     setCompanyForm({ name: "", city: "" });
-    setSuccessMessage("Empresa salva com sucesso.");
   }
 
   async function addRole() {
-    const payload = { obraId, companyId: Number(roleForm.companyId), name: roleForm.name };
+    const payload = { id: generateId(), obraId, companyId: Number(roleForm.companyId), name: roleForm.name };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("roles").insert({ obra_id: payload.obraId, company_id: payload.companyId, name: payload.name });
+      const { error } = await supabase.from("roles").insert({ id: payload.id, obra_id: payload.obraId, company_id: payload.companyId, name: payload.name });
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
-      const localPayload = { id: generateId(), ...payload };
-      setData((prev) => ({ ...prev, roles: [...prev.roles, localPayload] }));
+      setData((prev) => ({ ...prev, roles: [...prev.roles, payload] }));
     }
     setRoleModal(false);
     setRoleForm({ companyId: "", name: "" });
-    setSuccessMessage("Função salva com sucesso.");
   }
 
   async function addAttendanceRecord() {
     const companyId = Number(attendanceBatchCompanyId);
-    const validRoles = filteredData.roles.filter((role) => Number(role.companyId) === companyId);
-    const payloads = validRoles
-      .map((role) => ({
-        obraId,
-        companyId,
-        roleId: role.id,
-        qty: Number(attendanceBatchQuantities[role.id] || 0),
-      }))
-      .filter((item) => item.qty > 0);
+    const validRoles = filteredData.roles.filter((role) => role.companyId === companyId);
+    const payloads = validRoles.map((role) => ({
+      id: generateId(),
+      obraId,
+      companyId,
+      roleId: role.id,
+      qty: Number(attendanceBatchQuantities[role.id] || 0),
+    })).filter((item) => item.qty > 0);
 
     if (!companyId) return;
 
@@ -1208,93 +904,43 @@ export default function App() {
         if (deleteError) return setErrorMessage(deleteError.message);
       }
       if (payloads.length) {
-        const { error } = await supabase.from("attendance_records").insert(payloads.map((item) => ({ obra_id: item.obraId, company_id: item.companyId, role_id: item.roleId, qty: item.qty })));
+        const { error } = await supabase.from("attendance_records").insert(payloads.map((item) => ({ id: item.id, obra_id: item.obraId, company_id: item.companyId, role_id: item.roleId, qty: item.qty })));
         if (error) return setErrorMessage(error.message);
       }
       await fetchAllData();
     } else {
-      const localPayloads = payloads.map((item) => ({ id: generateId(), ...item }));
-      setData((prev) => ({ ...prev, attendance: [...prev.attendance.filter((item) => !(String(item.obraId) === String(obraId) && Number(item.companyId) === companyId)), ...localPayloads] }));
+      setData((prev) => ({ ...prev, attendance: [...prev.attendance.filter((item) => !(sameId(item.obraId, obraId) && item.companyId === companyId)), ...payloads] }));
     }
 
     setAttendanceModal(false);
     setAttendanceBatchCompanyId("");
     setAttendanceBatchQuantities({});
-    setSuccessMessage("Presença salva com sucesso.");
   }
 
   async function addStockItem() {
-    const payload = { obraId, item: stockForm.item, unit: stockForm.unit, quantity: Number(stockForm.quantity), min: Number(stockForm.min), category: stockForm.category, invoice: stockForm.invoice, price: Number(stockForm.price) };
+    const payload = { id: generateId(), obraId, item: stockForm.item, unit: stockForm.unit, quantity: Number(stockForm.quantity), min: Number(stockForm.min), category: stockForm.category, invoice: stockForm.invoice, price: Number(stockForm.price) };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("stock_items").insert({ obra_id: payload.obraId, item: payload.item, unit: payload.unit, quantity: payload.quantity, min_quantity: payload.min, category: payload.category, invoice: payload.invoice, price: payload.price });
+      const { error } = await supabase.from("stock_items").insert({ id: payload.id, obra_id: payload.obraId, item: payload.item, unit: payload.unit, quantity: payload.quantity, min_quantity: payload.min, category: payload.category, invoice: payload.invoice, price: payload.price });
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
-      const localPayload = { id: generateId(), ...payload };
-      setData((prev) => ({ ...prev, stock: [...prev.stock, localPayload] }));
+      setData((prev) => ({ ...prev, stock: [...prev.stock, payload] }));
     }
     setStockModal(false);
     setStockForm({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
-    setSuccessMessage("Material salvo com sucesso.");
   }
 
   async function addMaintenanceOrder() {
-    const isEditing = Boolean(editingMaintenanceId);
-    const payload = { obraId: editingMaintenanceObraId || obraId, ...maintenanceForm };
+    const payload = { id: generateId(), obraId, ...maintenanceForm };
     if (onlineMode && isSupabaseConfigured) {
-      if (editingMaintenanceId) {
-        const { error } = await supabase
-          .from("maintenance_orders")
-          .update({
-            title: payload.service,
-            os: payload.os,
-            service: payload.service,
-            requester: payload.requester,
-            request_date: payload.requestDate,
-            realization_date: payload.realizationDate || null,
-            delivery_date: payload.deliveryDate || null,
-            cost: Number(payload.cost),
-            limit_date: payload.limitDate,
-            responsible: payload.responsible,
-            observacao: payload.observacao || "",
-          })
-          .eq("id", editingMaintenanceId)
-          .eq("obra_id", payload.obraId);
-        if (error) return setErrorMessage(error.message);
-      } else {
-        const { error } = await supabase.from("maintenance_orders").insert({
-          obra_id: payload.obraId,
-          title: payload.service,
-          os: payload.os,
-          service: payload.service,
-          requester: payload.requester,
-          request_date: payload.requestDate,
-          realization_date: payload.realizationDate || null,
-          delivery_date: payload.deliveryDate || null,
-          cost: Number(payload.cost),
-          limit_date: payload.limitDate,
-          responsible: payload.responsible,
-          observacao: payload.observacao || "",
-        });
-        if (error) return setErrorMessage(error.message);
-      }
+      const { error } = await supabase.from("maintenance_orders").insert({ id: payload.id, obra_id: payload.obraId, os: payload.os, service: payload.service, requester: payload.requester, request_date: payload.requestDate, realization_date: payload.realizationDate || null, delivery_date: payload.deliveryDate || null, cost: Number(payload.cost), limit_date: payload.limitDate, responsible: payload.responsible });
+      if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
-      if (editingMaintenanceId) {
-        setData((prev) => ({
-          ...prev,
-          maintenance: prev.maintenance.map((item) =>
-            item.id === editingMaintenanceId ? { ...item, obraId: payload.obraId, ...payload } : item
-          ),
-        }));
-      } else {
-        const localPayload = { id: generateId(), ...payload };
-        setData((prev) => ({ ...prev, maintenance: [...prev.maintenance, localPayload] }));
-      }
+      setData((prev) => ({ ...prev, maintenance: [...prev.maintenance, payload] }));
     }
     setMaintenanceModal(false);
-    resetMaintenanceForm();
-    setSuccessMessage(isEditing ? "OS atualizada com sucesso." : "OS cadastrada com sucesso.");
+    setMaintenanceForm({ os: "", service: "", requester: "", requestDate: getTodayISO(), realizationDate: "", deliveryDate: "", cost: 0, limitDate: addDaysISO(getTodayISO(), 7), responsible: "" });
   }
 
   async function deleteCompany(id) {
@@ -1351,13 +997,12 @@ export default function App() {
     if (!obraAtual) return;
     const snapshot = { id: generateId(), obraId: obraAtual.id, date: getTodayISO(), createdAt: new Date().toISOString(), obraName: obraAtual.nome, stock: filteredData.stock, maintenance: filteredData.maintenance, attendance: filteredData.attendance };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("history_snapshots").insert({ obra_id: snapshot.obraId, date: snapshot.date, obra_nome: snapshot.obraName, snapshot: { stock: snapshot.stock, maintenance: snapshot.maintenance, attendance: snapshot.attendance } });
+      const { error } = await supabase.from("history_snapshots").insert({ id: snapshot.id, obra_id: snapshot.obraId, date: snapshot.date, obra_nome: snapshot.obraName, snapshot: { stock: snapshot.stock, maintenance: snapshot.maintenance, attendance: snapshot.attendance } });
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
       setData((prev) => ({ ...prev, history: [snapshot, ...prev.history] }));
     }
-    setSuccessMessage("Dia fechado com sucesso.");
   }
 
   function buildBackup() {
@@ -1384,29 +1029,8 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-
-        const importedData = {
-          obras: parsed.data.obras || [],
-          companies: parsed.data.companies || [],
-          roles: parsed.data.roles || [],
-          stock: parsed.data.stock || [],
-          maintenance: (parsed.data.maintenance || []).map((item) => ({
-            ...item,
-            observacao: item.observacao || "",
-          })),
-          attendance: parsed.data.attendance || [],
-          history: parsed.data.history || [],
-        };
-
-        setOnlineMode(false);
-        setErrorMessage("");
-        setData(importedData);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(importedData));
-        }
-        const nextObraId = importedData.obras?.[0]?.id || "";
-        setObraId(nextObraId);
-        setSuccessMessage("Backup importado em modo local.");
+        setData(parsed.data);
+        if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
       } catch (error) {
         setErrorMessage("Não foi possível ler o backup. Verifique se é um JSON exportado pelo sistema.");
       }
@@ -1418,25 +1042,19 @@ export default function App() {
     setData(initialData);
     setCurrentPage("dashboard");
     setSearch("");
-    setObraId(initialData.obras[0]?.id || "");
+    setObraId(data.obras[0]?.id || "");
     setErrorMessage("");
-    setSuccessMessage("");
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(LOCAL_DATA_KEY);
-      window.localStorage.removeItem(LOCAL_SELECTED_OBRA_KEY);
-    }
   }
 
   const connectionBadge = (
     <div className="flex items-center gap-2">
       <ConnectionBadge configured={isSupabaseConfigured} onlineMode={onlineMode} />
-      {isSupabaseConfigured ? <Button variant="outline" className="h-10 rounded-full px-4" onClick={() => setOnlineMode((prev) => !prev)}>{onlineMode ? "Ir para local" : "Ir para online"}</Button> : null}
     </div>
   );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1520px] px-3 md:px-4 xl:px-5">
+      <div className="flex min-h-screen">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
         <div className="flex-1 min-w-0">
           <Topbar
@@ -1456,7 +1074,6 @@ export default function App() {
           <input id="backup-input" type="file" accept=".json,application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importBackupFromFile(e.target.files[0])} />
 
           {errorMessage ? <div className="px-6 md:px-12 pt-6"><div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div></div> : null}
-          {successMessage ? <div className="px-6 md:px-12 pt-6"><div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</div></div> : null}
 
           <main className="px-6 md:px-12 py-8 md:py-10">
             {loading ? (
@@ -1469,7 +1086,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} statusFilter={maintenanceStatusFilter} setStatusFilter={setMaintenanceStatusFilter} responsibleFilter={maintenanceResponsibleFilter} setResponsibleFilter={setMaintenanceResponsibleFilter} responsibleOptions={maintenanceResponsibleOptions} onViewObservation={setObservationModalItem} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openEditMaintenanceModal} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={() => setMaintenanceModal(true)} onDelete={deleteMaintenanceOrder} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -1507,27 +1124,6 @@ export default function App() {
               ))}
             </div>
           </Card>
-        </div>
-      </Modal>
-
-      <Modal open={Boolean(observationModalItem)} title={observationModalItem ? `Observações da OS ${observationModalItem.os}` : "Observações"} onClose={() => setObservationModalItem(null)}>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Serviço</p>
-              <p className="mt-1 font-semibold text-slate-900">{observationModalItem?.service || "-"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Responsável</p>
-              <p className="mt-1 font-semibold text-slate-900">{observationModalItem?.responsible || "-"}</p>
-            </div>
-          </div>
-          <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 min-h-[180px] whitespace-pre-wrap text-sm leading-6 text-slate-700">
-            {observationModalItem?.observacao || "Sem observações registradas."}
-          </div>
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setObservationModalItem(null)}>Fechar</Button>
-          </div>
         </div>
       </Modal>
 
@@ -1585,29 +1181,19 @@ export default function App() {
         <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setStockModal(false)}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
       </Modal>
 
-      <Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={() => { setMaintenanceModal(false); resetMaintenanceForm(); }}>
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
-            <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
-            <Field label="Solicitante"><Input value={maintenanceForm.requester} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requester: e.target.value }))} /></Field>
-            <Field label="Data solicitação"><Input type="date" value={maintenanceForm.requestDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requestDate: e.target.value, limitDate: addDaysISO(e.target.value, 7) }))} /></Field>
-            <Field label="Data realização do serviço"><Input type="date" value={maintenanceForm.realizationDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, realizationDate: e.target.value }))} /></Field>
-            <Field label="Data entrega"><Input type="date" value={maintenanceForm.deliveryDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, deliveryDate: e.target.value }))} /></Field>
-            <Field label="Custo do serviço (R$)"><Input type="number" step="0.01" value={maintenanceForm.cost} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, cost: e.target.value }))} /></Field>
-            <Field label="Data limite"><Input type="date" value={maintenanceForm.limitDate} readOnly /></Field>
-            <Field label="Responsável"><Input value={maintenanceForm.responsible} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
-          </div>
-          <Field label="Observações">
-            <Textarea value={maintenanceForm.observacao} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, observacao: e.target.value }))} placeholder="Registre detalhes importantes da OS, restrições, contexto ou orientações para execução." />
-          </Field>
-          <div className="mt-5 flex justify-end gap-3">
-            <Button variant="outline" onClick={() => { setMaintenanceModal(false); resetMaintenanceForm(); }}>Cancelar</Button>
-            <Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !(editingMaintenanceObraId || obraAtual)}>
-              {editingMaintenanceId ? "Salvar alterações" : "Salvar"}
-            </Button>
-          </div>
+      <Modal open={maintenanceModal} title="Nova manutenção" onClose={() => setMaintenanceModal(false)}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
+          <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
+          <Field label="Solicitante"><Input value={maintenanceForm.requester} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requester: e.target.value }))} /></Field>
+          <Field label="Data solicitação"><Input type="date" value={maintenanceForm.requestDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requestDate: e.target.value, limitDate: addDaysISO(e.target.value, 7) }))} /></Field>
+          <Field label="Data realização do serviço"><Input type="date" value={maintenanceForm.realizationDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, realizationDate: e.target.value }))} /></Field>
+          <Field label="Data entrega"><Input type="date" value={maintenanceForm.deliveryDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, deliveryDate: e.target.value }))} /></Field>
+          <Field label="Custo do serviço (R$)"><Input type="number" step="0.01" value={maintenanceForm.cost} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, cost: e.target.value }))} /></Field>
+          <Field label="Data limite"><Input type="date" value={maintenanceForm.limitDate} readOnly /></Field>
+          <Field label="Responsável"><Input value={maintenanceForm.responsible} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
         </div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setMaintenanceModal(false)}>Cancelar</Button><Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !obraAtual}>Salvar</Button></div>
       </Modal>
     </div>
   );
