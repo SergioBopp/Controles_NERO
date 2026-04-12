@@ -16,6 +16,8 @@ import {
   Building2,
   Users,
   Wrench,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -37,6 +39,11 @@ const initialData = {
     { id: 3, companyId: 1, name: "Almoxarife" },
     { id: 4, companyId: 2, name: "Técnico de Segurança" },
     { id: 5, companyId: 2, name: "Eletricista" },
+  ],
+  maintenanceRoles: [
+    { id: "mr-1", name: "Eletricista", daily: 240 },
+    { id: "mr-2", name: "Encanador", daily: 260 },
+    { id: "mr-3", name: "Pintor", daily: 220 },
   ],
   maintenance: [],
   stock: [],
@@ -123,6 +130,129 @@ function getDelayIndicator(item) {
   const diff = diffDaysFromToday(item.limitDate);
   return diff > 0 ? `${diff} dia${diff > 1 ? "s" : ""}` : "-";
 }
+
+
+const MAINTENANCE_ROLES_STORAGE_KEY = "nero_maintenance_roles_v10";
+const MAINTENANCE_DETAILS_STORAGE_KEY = "nero_maintenance_details_v10";
+
+function createEmptyLaborEntry() {
+  return { id: generateUuid(), roleId: "", roleName: "", daily: 0, hours: 0 };
+}
+
+function createEmptyMaintenanceForm() {
+  return {
+    os: "",
+    service: "",
+    requester: "",
+    requestDate: getTodayISO(),
+    realizationDate: "",
+    deliveryDate: "",
+    limitDate: addDaysISO(getTodayISO(), 7),
+    responsible: "",
+    labor: [createEmptyLaborEntry()],
+    materialCost: 0,
+    bdi: 0,
+    laborTotal: 0,
+    subtotal: 0,
+    totalCost: 0,
+    cost: 0,
+  };
+}
+
+function getHourlyRate(daily) {
+  return Number(daily || 0) / 8;
+}
+
+function calculateLaborLine(line) {
+  const daily = Number(line?.daily || 0);
+  const hours = Number(line?.hours || 0);
+  const hourly = getHourlyRate(daily);
+  const subtotal = hourly * hours;
+  return {
+    ...line,
+    daily,
+    hours,
+    hourly,
+    subtotal,
+  };
+}
+
+function calculateMaintenanceItem(item) {
+  const labor = (item?.labor || []).map(calculateLaborLine).filter((line) => line.roleId || line.roleName || line.hours || line.daily);
+  const laborTotal = labor.reduce((acc, line) => acc + Number(line.subtotal || 0), 0);
+  const materialCost = Number(item?.materialCost || 0);
+  const bdi = Number(item?.bdi || 0);
+  const subtotal = laborTotal + materialCost;
+  const totalCost = subtotal * (1 + bdi / 100);
+  return {
+    ...item,
+    labor,
+    materialCost,
+    bdi,
+    laborTotal,
+    subtotal,
+    totalCost,
+    cost: totalCost,
+  };
+}
+
+function readJsonStorage(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getStoredMaintenanceRoles(defaultRoles = []) {
+  const stored = readJsonStorage(MAINTENANCE_ROLES_STORAGE_KEY, null);
+  return Array.isArray(stored) && stored.length ? stored : defaultRoles;
+}
+
+function saveStoredMaintenanceRoles(roles) {
+  writeJsonStorage(MAINTENANCE_ROLES_STORAGE_KEY, roles);
+}
+
+function getStoredMaintenanceDetails() {
+  return readJsonStorage(MAINTENANCE_DETAILS_STORAGE_KEY, {});
+}
+
+function saveStoredMaintenanceDetails(detailsMap) {
+  writeJsonStorage(MAINTENANCE_DETAILS_STORAGE_KEY, detailsMap);
+}
+
+function upsertStoredMaintenanceDetail(item) {
+  const current = getStoredMaintenanceDetails();
+  current[item.id] = {
+    labor: item.labor || [],
+    materialCost: Number(item.materialCost || 0),
+    bdi: Number(item.bdi || 0),
+    laborTotal: Number(item.laborTotal || 0),
+    subtotal: Number(item.subtotal || 0),
+    totalCost: Number(item.totalCost || item.cost || 0),
+  };
+  saveStoredMaintenanceDetails(current);
+}
+
+function removeStoredMaintenanceDetail(id) {
+  const current = getStoredMaintenanceDetails();
+  delete current[id];
+  saveStoredMaintenanceDetails(current);
+}
+
+function mergeMaintenanceWithStoredDetails(items) {
+  const stored = getStoredMaintenanceDetails();
+  return (items || []).map((item) => calculateMaintenanceItem({ ...stored[item.id], ...item }));
+}
+
 
 async function loadImageDataUrl(src) {
   const response = await fetch(src);
@@ -336,37 +466,16 @@ function Topbar({
 }
 
 function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "default" }) {
-  const toneStyles = {
-    default: {
-      border: alert ? "border-rose-200" : "border-slate-200",
-      icon: alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700",
-      value: "text-slate-900",
-      glow: "to-slate-50/60",
-    },
-    success: {
-      border: "border-emerald-200",
-      icon: "bg-emerald-100 text-emerald-700",
-      value: "text-emerald-700",
-      glow: "to-emerald-50/70",
-    },
-    danger: {
-      border: "border-rose-200",
-      icon: "bg-rose-100 text-rose-700",
-      value: "text-rose-700",
-      glow: "to-rose-50/70",
-    },
-  };
-
-  const styles = toneStyles[tone] || toneStyles.default;
-
+  const isDanger = tone === "danger" || (!!alert && tone === "default");
+  const isSuccess = tone === "success";
   return (
     <div
       className={cn(
         "relative overflow-hidden rounded-[22px] border bg-white p-5 transition-all duration-300 shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]",
-        styles.border
+        isDanger ? "border-rose-200" : isSuccess ? "border-emerald-200" : "border-slate-200"
       )}
     >
-      <div className={cn("absolute inset-0 bg-gradient-to-br from-transparent via-transparent pointer-events-none", styles.glow)} />
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -376,14 +485,14 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "defau
           <div
             className={cn(
               "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-              styles.icon
+              isDanger ? "bg-rose-100 text-rose-700" : isSuccess ? "bg-emerald-100 text-emerald-700" : "bg-emerald-50/70 text-emerald-700"
             )}
           >
             <Icon className="h-5 w-5" />
           </div>
         </div>
 
-        <p className={cn("mt-5 text-[2.2rem] font-bold leading-none tracking-tight", styles.value)}>
+        <p className={cn("mt-5 text-[2.2rem] font-bold leading-none tracking-tight", isDanger ? "text-rose-700" : isSuccess ? "text-emerald-700" : "text-slate-900")}>
           {value}
         </p>
 
@@ -415,7 +524,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
   const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
-  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.cost || item.estimated_cost || 0), 0);
+  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.totalCost || item.cost || item.estimated_cost || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -488,29 +597,27 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit }) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onManageRoles, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
     delivered: items.filter((item) => getMaintenanceStatus(item) === "Entregue").length,
-    totalCost: items.reduce((acc, item) => acc + Number(item.cost || item.estimated_cost || 0), 0),
+    totalCost: items.reduce((acc, item) => acc + Number(item.totalCost || item.cost || 0), 0),
   };
-
-  const totalCostTone = summary.totalCost > 0 ? "danger" : "success";
-  const totalCostSubtitle = summary.totalCost > 0 ? "Total geral das OS" : "Sem custo lançado nas OS";
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader
           title="Manutenções"
-          description="Controle de OS, prazos automáticos, status e atraso"
+          description="Controle de OS, composição de mão de obra, materiais, BDI e atraso"
           right={
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <Button variant="outline" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button onClick={onAdd}>Nova manutenção</Button>
               <ReturnHomeButton onClick={onBack} />
             </div>
@@ -522,7 +629,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
         <HomeStatCard title="OS abertas" value={summary.open} subtitle="Ainda sem entrega" icon={Clock3} />
         <HomeStatCard title="OS atrasadas" value={summary.delayed} subtitle="Prazo excedido" icon={AlertTriangle} alert={summary.delayed > 0} />
         <HomeStatCard title="OS entregues" value={summary.delivered} subtitle="Serviços concluídos" icon={FileText} />
-        <HomeStatCard title="Valor total" value={formatCurrencyBR(summary.totalCost)} subtitle={totalCostSubtitle} icon={Briefcase} tone={totalCostTone} />
+        <HomeStatCard title="Valor total" value={formatCurrencyBR(summary.totalCost)} subtitle="Soma geral das OS" icon={Briefcase} tone={summary.totalCost > 0 ? "danger" : "success"} />
       </section>
 
       <Card className="overflow-hidden">
@@ -530,7 +637,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-100">
-                {["OS", "SERVIÇO", "SOLICITANTE", "DATA SOLICITAÇÃO", "DATA REALIZAÇÃO", "DATA ENTREGA", "CUSTO (R$)", "DATA LIMITE", "RESPONSÁVEL", "STATUS", "ATRASO", "AÇÕES"].map((head) => (
+                {["OS", "SERVIÇO", "SOLICITANTE", "MÃO DE OBRA", "MATERIAIS", "BDI", "CUSTO TOTAL", "DATA LIMITE", "RESPONSÁVEL", "STATUS", "ATRASO", "AÇÕES"].map((head) => (
                   <th key={head} className="border-b border-slate-200 px-4 py-3 text-left text-xs font-bold text-slate-900 whitespace-nowrap">{head}</th>
                 ))}
               </tr>
@@ -544,10 +651,10 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.os}</td>
                     <td className="border-b border-slate-200 px-4 py-3 min-w-[220px]">{item.service}</td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.requester || "-"}</td>
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.requestDate)}</td>
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.realizationDate)}</td>
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.deliveryDate)}</td>
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatCurrencyBR(item.cost)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatCurrencyBR(item.laborTotal)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatCurrencyBR(item.materialCost)}</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{Number(item.bdi || 0).toFixed(2)}%</td>
+                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap font-semibold">{formatCurrencyBR(item.totalCost || item.cost)}</td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{formatDateBR(item.limitDate)}</td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">{item.responsible || "-"}</td>
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
@@ -783,7 +890,7 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
 }
 
 export default function App() {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState(() => ({ ...initialData, maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles) }));
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [obraId, setObraId] = useState("");
@@ -794,6 +901,7 @@ export default function App() {
   const [attendanceModal, setAttendanceModal] = useState(false);
   const [stockModal, setStockModal] = useState(false);
   const [maintenanceModal, setMaintenanceModal] = useState(false);
+  const [maintenanceRoleModal, setMaintenanceRoleModal] = useState(false);
   const [companyModal, setCompanyModal] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   const [obraModal, setObraModal] = useState(false);
@@ -802,35 +910,28 @@ export default function App() {
   const [attendanceBatchQuantities, setAttendanceBatchQuantities] = useState({});
   const [companyForm, setCompanyForm] = useState({ name: "", city: "" });
   const [roleForm, setRoleForm] = useState({ companyId: "", name: "" });
+  const [maintenanceRoleForm, setMaintenanceRoleForm] = useState({ name: "", daily: 0 });
   const [obraForm, setObraForm] = useState({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   const [stockForm, setStockForm] = useState({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
-  const createEmptyMaintenanceForm = () => ({
-    os: "",
-    service: "",
-    requester: "",
-    requestDate: getTodayISO(),
-    realizationDate: "",
-    deliveryDate: "",
-    cost: 0,
-    limitDate: addDaysISO(getTodayISO(), 7),
-    responsible: "",
-  });
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
 
   const obraAtual = useMemo(() => data.obras.find((obra) => sameId(obra.id, obraId)) || null, [data.obras, obraId]);
 
   const filteredData = useMemo(() => {
-    if (!obraAtual) return { companies: data.companies, roles: data.roles, stock: [], maintenance: [], attendance: [], history: [] };
+    if (!obraAtual) return { companies: data.companies, roles: data.roles, maintenanceRoles: data.maintenanceRoles || [], stock: [], maintenance: [], attendance: [], history: [] };
     return {
       companies: data.companies.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
       roles: data.roles.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
+      maintenanceRoles: data.maintenanceRoles || [],
       stock: data.stock.filter((item) => sameId(item.obraId, obraAtual.id)),
       maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)),
       attendance: data.attendance.filter((item) => sameId(item.obraId, obraAtual.id)),
       history: data.history.filter((item) => sameId(item.obraId, obraAtual.id)),
     };
   }, [data, obraAtual]);
+
+  const maintenancePreview = useMemo(() => calculateMaintenanceItem(maintenanceForm), [maintenanceForm]);
 
   const selectedAttendanceRoles = useMemo(() => {
     return filteredData.roles.filter((role) => String(role.companyId) === String(attendanceBatchCompanyId));
@@ -843,7 +944,7 @@ export default function App() {
   const filteredMaintenance = useMemo(() => {
     if (!search.trim()) return filteredData.maintenance;
     return filteredData.maintenance.filter((item) =>
-      [item.os, item.service, item.requester, item.responsible, getMaintenanceStatus(item), getDelayIndicator(item)]
+      [item.os, item.service, item.requester, item.responsible, (item.labor || []).map((line) => line.roleName).join(" "), getMaintenanceStatus(item), getDelayIndicator(item)]
         .join(" ")
         .toLowerCase()
         .includes(search.toLowerCase())
@@ -875,10 +976,11 @@ export default function App() {
         obras: (obrasRes.data || []).map((row) => ({ id: row.id, nome: row.nome, cliente: row.cliente, local: row.local, status: row.status, dataInicio: row.data_inicio, observacao: row.observacao })),
         companies: (companiesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, city: row.city })),
         roles: (rolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, name: row.name })),
+        maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles),
         stock: (stockRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
-        maintenance: (maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service, requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible })),
+        maintenance: mergeMaintenanceWithStoredDetails((maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service, requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible }))),
         attendance: (attendanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, roleId: row.role_id, qty: row.qty })),
-        history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: row.snapshot?.maintenance || [], attendance: row.snapshot?.attendance || [] })),
+        history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
       };
 
       setData(nextData);
@@ -899,6 +1001,25 @@ export default function App() {
   useEffect(() => {
     fetchAllData();
   }, [onlineMode]);
+
+  useEffect(() => {
+    saveStoredMaintenanceRoles(data.maintenanceRoles || []);
+  }, [data.maintenanceRoles]);
+
+  useEffect(() => {
+    const details = {};
+    (data.maintenance || []).forEach((item) => {
+      details[item.id] = {
+        labor: item.labor || [],
+        materialCost: Number(item.materialCost || 0),
+        bdi: Number(item.bdi || 0),
+        laborTotal: Number(item.laborTotal || 0),
+        subtotal: Number(item.subtotal || 0),
+        totalCost: Number(item.totalCost || item.cost || 0),
+      };
+    });
+    saveStoredMaintenanceDetails(details);
+  }, [data.maintenance]);
 
   async function addObra() {
     const payload = { id: generateUuid(), ...obraForm };
@@ -938,6 +1059,50 @@ export default function App() {
     }
     setRoleModal(false);
     setRoleForm({ companyId: "", name: "" });
+  }
+
+  function addMaintenanceRole() {
+    const payload = { id: generateUuid(), name: maintenanceRoleForm.name.trim(), daily: Number(maintenanceRoleForm.daily || 0) };
+    if (!payload.name) return;
+    setData((prev) => ({ ...prev, maintenanceRoles: [...(prev.maintenanceRoles || []), payload].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")) }));
+    setMaintenanceRoleForm({ name: "", daily: 0 });
+  }
+
+  function deleteMaintenanceRole(id) {
+    setData((prev) => ({
+      ...prev,
+      maintenanceRoles: (prev.maintenanceRoles || []).filter((item) => !sameId(item.id, id)),
+      maintenance: prev.maintenance.map((item) =>
+        calculateMaintenanceItem({
+          ...item,
+          labor: (item.labor || []).filter((line) => !sameId(line.roleId, id)),
+        })
+      ),
+    }));
+  }
+
+  function addMaintenanceLaborLine() {
+    setMaintenanceForm((prev) => ({ ...prev, labor: [...(prev.labor || []), createEmptyLaborEntry()] }));
+  }
+
+  function removeMaintenanceLaborLine(lineId) {
+    setMaintenanceForm((prev) => ({ ...prev, labor: (prev.labor || []).filter((line) => line.id !== lineId) }));
+  }
+
+  function updateMaintenanceLaborLine(lineId, patch) {
+    setMaintenanceForm((prev) => ({
+      ...prev,
+      labor: (prev.labor || []).map((line) => (line.id === lineId ? { ...line, ...patch } : line)),
+    }));
+  }
+
+  function handleMaintenanceRoleSelection(lineId, roleId) {
+    const selectedRole = (data.maintenanceRoles || []).find((role) => sameId(role.id, roleId));
+    updateMaintenanceLaborLine(lineId, {
+      roleId,
+      roleName: selectedRole?.name || "",
+      daily: Number(selectedRole?.daily || 0),
+    });
   }
 
   async function addAttendanceRecord() {
@@ -999,52 +1164,72 @@ export default function App() {
   }
 
   function openMaintenanceEditor(item) {
+    const normalized = calculateMaintenanceItem(item);
     setEditingMaintenanceId(item.id);
     setMaintenanceForm({
-      os: item.os || "",
-      service: item.service || "",
-      requester: item.requester || "",
-      requestDate: item.requestDate || getTodayISO(),
-      realizationDate: item.realizationDate || "",
-      deliveryDate: item.deliveryDate || "",
-      cost: item.cost || 0,
-      limitDate: item.limitDate || addDaysISO(getTodayISO(), 7),
-      responsible: item.responsible || "",
+      os: normalized.os || "",
+      service: normalized.service || "",
+      requester: normalized.requester || "",
+      requestDate: normalized.requestDate || getTodayISO(),
+      realizationDate: normalized.realizationDate || "",
+      deliveryDate: normalized.deliveryDate || "",
+      limitDate: normalized.limitDate || addDaysISO(getTodayISO(), 7),
+      responsible: normalized.responsible || "",
+      labor: normalized.labor?.length ? normalized.labor.map((line) => ({ id: line.id || generateUuid(), roleId: line.roleId || "", roleName: line.roleName || "", daily: Number(line.daily || 0), hours: Number(line.hours || 0) })) : [createEmptyLaborEntry()],
+      materialCost: Number(normalized.materialCost || 0),
+      bdi: Number(normalized.bdi || 0),
+      laborTotal: Number(normalized.laborTotal || 0),
+      subtotal: Number(normalized.subtotal || 0),
+      totalCost: Number(normalized.totalCost || normalized.cost || 0),
+      cost: Number(normalized.totalCost || normalized.cost || 0),
     });
     setMaintenanceModal(true);
   }
 
   async function addMaintenanceOrder() {
-    const payload = { id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm };
+    const computed = calculateMaintenanceItem({ id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm });
     if (onlineMode && isSupabaseConfigured) {
       if (editingMaintenanceId) {
         const { error } = await supabase
           .from("maintenance_orders")
           .update({
-            obra_id: payload.obraId,
-            os: payload.os,
-            service: payload.service,
-            requester: payload.requester,
-            request_date: payload.requestDate,
-            realization_date: payload.realizationDate || null,
-            delivery_date: payload.deliveryDate || null,
-            cost: Number(payload.cost),
-            limit_date: payload.limitDate,
-            responsible: payload.responsible,
+            obra_id: computed.obraId,
+            os: computed.os,
+            service: computed.service,
+            requester: computed.requester,
+            request_date: computed.requestDate,
+            realization_date: computed.realizationDate || null,
+            delivery_date: computed.deliveryDate || null,
+            cost: Number(computed.totalCost || 0),
+            limit_date: computed.limitDate,
+            responsible: computed.responsible,
           })
           .eq("id", editingMaintenanceId);
         if (error) return setErrorMessage(error.message);
       } else {
-        const { error } = await supabase.from("maintenance_orders").insert({ id: payload.id, obra_id: payload.obraId, os: payload.os, service: payload.service, requester: payload.requester, request_date: payload.requestDate, realization_date: payload.realizationDate || null, delivery_date: payload.deliveryDate || null, cost: Number(payload.cost), limit_date: payload.limitDate, responsible: payload.responsible });
+        const { error } = await supabase.from("maintenance_orders").insert({
+          id: computed.id,
+          obra_id: computed.obraId,
+          os: computed.os,
+          service: computed.service,
+          requester: computed.requester,
+          request_date: computed.requestDate,
+          realization_date: computed.realizationDate || null,
+          delivery_date: computed.deliveryDate || null,
+          cost: Number(computed.totalCost || 0),
+          limit_date: computed.limitDate,
+          responsible: computed.responsible,
+        });
         if (error) return setErrorMessage(error.message);
       }
+      upsertStoredMaintenanceDetail(computed);
       await fetchAllData();
     } else {
       setData((prev) => ({
         ...prev,
         maintenance: editingMaintenanceId
-          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? { ...item, ...payload } : item)
-          : [...prev.maintenance, payload],
+          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? computed : item)
+          : [...prev.maintenance, computed],
       }));
     }
     closeMaintenanceModal();
@@ -1091,6 +1276,7 @@ export default function App() {
   }
 
   async function deleteMaintenanceOrder(id) {
+    removeStoredMaintenanceDetail(id);
     if (onlineMode && isSupabaseConfigured) {
       const { error } = await supabase.from("maintenance_orders").delete().eq("id", id);
       if (error) return setErrorMessage(error.message);
@@ -1136,7 +1322,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-        setData(parsed.data);
+        setData({ ...parsed.data, maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles), maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)) });
         if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
       } catch (error) {
         setErrorMessage("Não foi possível ler o backup. Verifique se é um JSON exportado pelo sistema.");
@@ -1146,10 +1332,12 @@ export default function App() {
   }
 
   function resetData() {
+    saveStoredMaintenanceRoles(initialData.maintenanceRoles);
+    saveStoredMaintenanceDetails({});
     setData(initialData);
     setCurrentPage("dashboard");
     setSearch("");
-    setObraId(data.obras[0]?.id || "");
+    setObraId(initialData.obras[0]?.id || "");
     setErrorMessage("");
   }
 
@@ -1193,7 +1381,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onManageRoles={() => setMaintenanceRoleModal(true)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -1275,6 +1463,44 @@ export default function App() {
         <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setRoleModal(false)}>Cancelar</Button><Button onClick={addRole} disabled={!roleForm.companyId || !roleForm.name || !obraAtual}>Salvar</Button></div>
       </Modal>
 
+
+      <Modal open={maintenanceRoleModal} title="Cargos da manutenção" onClose={() => setMaintenanceRoleModal(false)}>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1fr_auto] gap-4 items-end">
+            <Field label="Cargo">
+              <Input value={maintenanceRoleForm.name} onChange={(e) => setMaintenanceRoleForm((prev) => ({ ...prev, name: e.target.value }))} />
+            </Field>
+            <Field label="Diária (R$)">
+              <Input type="number" step="0.01" min="0" value={maintenanceRoleForm.daily} onChange={(e) => setMaintenanceRoleForm((prev) => ({ ...prev, daily: e.target.value }))} />
+            </Field>
+            <Button onClick={addMaintenanceRole} disabled={!maintenanceRoleForm.name.trim()}><Plus className="h-4 w-4" /> Adicionar</Button>
+          </div>
+
+          <Card>
+            <CardHeader title="Base de cargos cadastrados" description="Cadastro único para reutilizar em todas as OS" />
+            <div className="p-5 space-y-3">
+              {(data.maintenanceRoles || []).length ? (data.maintenanceRoles || []).map((role) => (
+                <div key={role.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{role.name}</p>
+                    <p className="text-sm text-slate-500">Diária: {formatCurrencyBR(role.daily)} • Hora: {formatCurrencyBR(getHourlyRate(role.daily))}</p>
+                  </div>
+                  <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => deleteMaintenanceRole(role.id)}><Trash2 className="h-4 w-4" /> Excluir</Button>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-slate-500">
+                  Nenhum cargo de manutenção cadastrado ainda.
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setMaintenanceRoleModal(false)}>Fechar</Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={stockModal} title="Novo material" onClose={() => setStockModal(false)}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Material"><Input value={stockForm.item} onChange={(e) => setStockForm((prev) => ({ ...prev, item: e.target.value }))} /></Field>
@@ -1289,18 +1515,108 @@ export default function App() {
       </Modal>
 
       <Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={closeMaintenanceModal}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
-          <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
-          <Field label="Solicitante"><Input value={maintenanceForm.requester} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requester: e.target.value }))} /></Field>
-          <Field label="Data solicitação"><Input type="date" value={maintenanceForm.requestDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requestDate: e.target.value, limitDate: addDaysISO(e.target.value, 7) }))} /></Field>
-          <Field label="Data realização do serviço"><Input type="date" value={maintenanceForm.realizationDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, realizationDate: e.target.value }))} /></Field>
-          <Field label="Data entrega"><Input type="date" value={maintenanceForm.deliveryDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, deliveryDate: e.target.value }))} /></Field>
-          <Field label="Custo do serviço (R$)"><Input type="number" step="0.01" value={maintenanceForm.cost} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, cost: e.target.value }))} /></Field>
-          <Field label="Data limite"><Input type="date" value={maintenanceForm.limitDate} readOnly /></Field>
-          <Field label="Responsável"><Input value={maintenanceForm.responsible} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
+            <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
+            <Field label="Solicitante"><Input value={maintenanceForm.requester} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requester: e.target.value }))} /></Field>
+            <Field label="Data solicitação"><Input type="date" value={maintenanceForm.requestDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requestDate: e.target.value, limitDate: addDaysISO(e.target.value, 7) }))} /></Field>
+            <Field label="Data realização do serviço"><Input type="date" value={maintenanceForm.realizationDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, realizationDate: e.target.value }))} /></Field>
+            <Field label="Data entrega"><Input type="date" value={maintenanceForm.deliveryDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, deliveryDate: e.target.value }))} /></Field>
+            <Field label="Data limite"><Input type="date" value={maintenanceForm.limitDate} readOnly /></Field>
+            <Field label="Responsável"><Input value={maintenanceForm.responsible} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
+            <Field label="BDI (%)"><Input type="number" step="0.01" min="0" value={maintenanceForm.bdi} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, bdi: e.target.value }))} /></Field>
+            <Field label="Materiais (R$)"><Input type="number" step="0.01" min="0" value={maintenanceForm.materialCost} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, materialCost: e.target.value }))} /></Field>
+          </div>
+
+          <Card>
+            <CardHeader
+              title="Composição da mão de obra"
+              description="Cada linha calcula: horas × (diária ÷ 8)"
+              right={<Button variant="outline" onClick={addMaintenanceLaborLine}><Plus className="h-4 w-4" /> Adicionar cargo</Button>}
+            />
+            <div className="p-5 space-y-4">
+              {(maintenanceForm.labor || []).length ? (maintenanceForm.labor || []).map((line) => {
+                const previewLine = calculateLaborLine(line);
+                return (
+                  <div key={line.id} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr_1fr_1fr_auto] gap-4 items-end">
+                      <Field label="Cargo">
+                        <SelectField
+                          value={String(line.roleId || "")}
+                          onChange={(value) => handleMaintenanceRoleSelection(line.id, value)}
+                          options={[
+                            { value: "", label: "Selecione..." },
+                            ...(data.maintenanceRoles || []).map((role) => ({ value: String(role.id), label: role.name })),
+                          ]}
+                        />
+                      </Field>
+
+                      <Field label="Diária (R$)">
+                        <Input type="number" value={previewLine.daily} readOnly />
+                      </Field>
+
+                      <Field label="Valor/hora (R$)">
+                        <Input type="number" value={previewLine.hourly.toFixed(2)} readOnly />
+                      </Field>
+
+                      <Field label="Horas consumidas">
+                        <Input type="number" step="0.01" min="0" value={line.hours} onChange={(e) => updateMaintenanceLaborLine(line.id, { hours: e.target.value })} />
+                      </Field>
+
+                      <Button
+                        variant="danger"
+                        className="w-full xl:w-auto"
+                        onClick={() => removeMaintenanceLaborLine(line.id)}
+                        disabled={(maintenanceForm.labor || []).length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" /> Remover
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Diária</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.daily)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Valor/hora</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.hourly)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Subtotal da linha</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.subtotal)}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-slate-500">
+                  Adicione pelo menos um cargo para compor a mão de obra da OS.
+                </div>
+              )}
+
+              {!data.maintenanceRoles?.length ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Cadastre os cargos da manutenção antes de lançar a composição da OS.
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <HomeStatCard title="Mão de obra" value={formatCurrencyBR(maintenancePreview.laborTotal)} subtitle="Soma das linhas de cargo" icon={Users} tone={maintenancePreview.laborTotal > 0 ? "default" : "success"} />
+            <HomeStatCard title="Subtotal" value={formatCurrencyBR(maintenancePreview.subtotal)} subtitle="Mão de obra + materiais" icon={Package} tone={maintenancePreview.subtotal > 0 ? "default" : "success"} />
+            <HomeStatCard title="Total com BDI" value={formatCurrencyBR(maintenancePreview.totalCost)} subtitle={`BDI aplicado: ${Number(maintenanceForm.bdi || 0).toFixed(2)}%`} icon={Briefcase} tone={maintenancePreview.totalCost > 0 ? "danger" : "success"} />
+          </section>
+
+          <div className="mt-5 flex justify-end gap-3">
+            <Button variant="outline" onClick={closeMaintenanceModal}>Cancelar</Button>
+            <Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !obraAtual || !(data.maintenanceRoles || []).length}>
+              {editingMaintenanceId ? "Salvar alterações" : "Salvar"}
+            </Button>
+          </div>
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={closeMaintenanceModal}>Cancelar</Button><Button onClick={addMaintenanceOrder} disabled={!maintenanceForm.os || !maintenanceForm.service || !obraAtual}>{editingMaintenanceId ? "Salvar alterações" : "Salvar"}</Button></div>
       </Modal>
     </div>
   );
