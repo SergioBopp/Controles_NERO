@@ -16,6 +16,8 @@ import {
   Building2,
   Users,
   Wrench,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -37,6 +39,11 @@ const initialData = {
     { id: 3, companyId: 1, name: "Almoxarife" },
     { id: 4, companyId: 2, name: "Técnico de Segurança" },
     { id: 5, companyId: 2, name: "Eletricista" },
+  ],
+  maintenanceRoles: [
+    { id: "mr-1", name: "Eletricista", daily: 240 },
+    { id: "mr-2", name: "Encanador", daily: 260 },
+    { id: "mr-3", name: "Pintor", daily: 220 },
   ],
   maintenance: [],
   stock: [],
@@ -123,6 +130,129 @@ function getDelayIndicator(item) {
   const diff = diffDaysFromToday(item.limitDate);
   return diff > 0 ? `${diff} dia${diff > 1 ? "s" : ""}` : "-";
 }
+
+
+const MAINTENANCE_ROLES_STORAGE_KEY = "nero_maintenance_roles_v10";
+const MAINTENANCE_DETAILS_STORAGE_KEY = "nero_maintenance_details_v10";
+
+function createEmptyLaborEntry() {
+  return { id: generateUuid(), roleId: "", roleName: "", daily: 0, hours: 0 };
+}
+
+function createEmptyMaintenanceForm() {
+  return {
+    os: "",
+    service: "",
+    requester: "",
+    requestDate: getTodayISO(),
+    realizationDate: "",
+    deliveryDate: "",
+    limitDate: addDaysISO(getTodayISO(), 7),
+    responsible: "",
+    labor: [createEmptyLaborEntry()],
+    materialCost: 0,
+    bdi: 0,
+    laborTotal: 0,
+    subtotal: 0,
+    totalCost: 0,
+    cost: 0,
+  };
+}
+
+function getHourlyRate(daily) {
+  return Number(daily || 0) / 8;
+}
+
+function calculateLaborLine(line) {
+  const daily = Number(line?.daily || 0);
+  const hours = Number(line?.hours || 0);
+  const hourly = getHourlyRate(daily);
+  const subtotal = hourly * hours;
+  return {
+    ...line,
+    daily,
+    hours,
+    hourly,
+    subtotal,
+  };
+}
+
+function calculateMaintenanceItem(item) {
+  const labor = (item?.labor || []).map(calculateLaborLine).filter((line) => line.roleId || line.roleName || line.hours || line.daily);
+  const laborTotal = labor.reduce((acc, line) => acc + Number(line.subtotal || 0), 0);
+  const materialCost = Number(item?.materialCost || 0);
+  const bdi = Number(item?.bdi || 0);
+  const subtotal = laborTotal + materialCost;
+  const totalCost = subtotal * (1 + bdi / 100);
+  return {
+    ...item,
+    labor,
+    materialCost,
+    bdi,
+    laborTotal,
+    subtotal,
+    totalCost,
+    cost: totalCost,
+  };
+}
+
+function readJsonStorage(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getStoredMaintenanceRoles(defaultRoles = []) {
+  const stored = readJsonStorage(MAINTENANCE_ROLES_STORAGE_KEY, null);
+  return Array.isArray(stored) && stored.length ? stored : defaultRoles;
+}
+
+function saveStoredMaintenanceRoles(roles) {
+  writeJsonStorage(MAINTENANCE_ROLES_STORAGE_KEY, roles);
+}
+
+function getStoredMaintenanceDetails() {
+  return readJsonStorage(MAINTENANCE_DETAILS_STORAGE_KEY, {});
+}
+
+function saveStoredMaintenanceDetails(detailsMap) {
+  writeJsonStorage(MAINTENANCE_DETAILS_STORAGE_KEY, detailsMap);
+}
+
+function upsertStoredMaintenanceDetail(item) {
+  const current = getStoredMaintenanceDetails();
+  current[item.id] = {
+    labor: item.labor || [],
+    materialCost: Number(item.materialCost || 0),
+    bdi: Number(item.bdi || 0),
+    laborTotal: Number(item.laborTotal || 0),
+    subtotal: Number(item.subtotal || 0),
+    totalCost: Number(item.totalCost || item.cost || 0),
+  };
+  saveStoredMaintenanceDetails(current);
+}
+
+function removeStoredMaintenanceDetail(id) {
+  const current = getStoredMaintenanceDetails();
+  delete current[id];
+  saveStoredMaintenanceDetails(current);
+}
+
+function mergeMaintenanceWithStoredDetails(items) {
+  const stored = getStoredMaintenanceDetails();
+  return (items || []).map((item) => calculateMaintenanceItem({ ...stored[item.id], ...item }));
+}
+
 
 async function loadImageDataUrl(src) {
   const response = await fetch(src);
@@ -336,37 +466,16 @@ function Topbar({
 }
 
 function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "default" }) {
-  const toneStyles = {
-    default: {
-      border: alert ? "border-rose-200" : "border-slate-200",
-      icon: alert ? "bg-rose-100 text-rose-700" : "bg-emerald-50/70 text-emerald-700",
-      value: "text-slate-900",
-      glow: "to-slate-50/60",
-    },
-    success: {
-      border: "border-emerald-200",
-      icon: "bg-emerald-100 text-emerald-700",
-      value: "text-emerald-700",
-      glow: "to-emerald-50/70",
-    },
-    danger: {
-      border: "border-rose-200",
-      icon: "bg-rose-100 text-rose-700",
-      value: "text-rose-700",
-      glow: "to-rose-50/70",
-    },
-  };
-
-  const styles = toneStyles[tone] || toneStyles.default;
-
+  const isDanger = tone === "danger" || (!!alert && tone === "default");
+  const isSuccess = tone === "success";
   return (
     <div
       className={cn(
         "relative overflow-hidden rounded-[22px] border bg-white p-5 transition-all duration-300 shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]",
-        styles.border
+        isDanger ? "border-rose-200" : isSuccess ? "border-emerald-200" : "border-slate-200"
       )}
     >
-      <div className={cn("absolute inset-0 bg-gradient-to-br from-transparent via-transparent pointer-events-none", styles.glow)} />
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-slate-50/60 pointer-events-none" />
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -376,14 +485,14 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "defau
           <div
             className={cn(
               "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-              styles.icon
+              isDanger ? "bg-rose-100 text-rose-700" : isSuccess ? "bg-emerald-100 text-emerald-700" : "bg-emerald-50/70 text-emerald-700"
             )}
           >
             <Icon className="h-5 w-5" />
           </div>
         </div>
 
-        <p className={cn("mt-5 text-[2.2rem] font-bold leading-none tracking-tight", styles.value)}>
+        <p className={cn("mt-5 text-[2.2rem] font-bold leading-none tracking-tight", isDanger ? "text-rose-700" : isSuccess ? "text-emerald-700" : "text-slate-900")}>
           {value}
         </p>
 
@@ -415,7 +524,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
   const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
-  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.cost || item.estimated_cost || 0), 0);
+  const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.totalCost || item.cost || item.estimated_cost || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -488,7 +597,6 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-
 function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onManageRoles, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
@@ -509,7 +617,9 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <Button variant="outline" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
+              <Button variant="outline" onClick={onManageRoles}>
+                <Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})
+              </Button>
               <Button onClick={onAdd}>Nova manutenção</Button>
               <ReturnHomeButton onClick={onBack} />
             </div>
@@ -521,57 +631,98 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
         <HomeStatCard title="OS abertas" value={summary.open} subtitle="Ainda sem entrega" icon={Clock3} />
         <HomeStatCard title="OS atrasadas" value={summary.delayed} subtitle="Prazo excedido" icon={AlertTriangle} alert={summary.delayed > 0} />
         <HomeStatCard title="OS entregues" value={summary.delivered} subtitle="Serviços concluídos" icon={FileText} />
-        <HomeStatCard title="Valor total" value={formatCurrencyBR(summary.totalCost)} subtitle="Soma geral das OS" icon={Briefcase} tone={summary.totalCost > 0 ? "danger" : "success"} />
+        <HomeStatCard
+          title="Valor total"
+          value={formatCurrencyBR(summary.totalCost)}
+          subtitle={summary.totalCost > 0 ? "Soma geral das OS" : "Sem custo lançado nas OS"}
+          icon={Briefcase}
+          tone={summary.totalCost > 0 ? "danger" : "success"}
+        />
       </section>
 
-      <div className="space-y-4">
-        {items.length ? items.map((item) => {
-          const status = getMaintenanceStatus(item);
-          const atraso = getDelayIndicator(item);
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {items.length ? (
+          items.map((item) => {
+            const status = getMaintenanceStatus(item);
+            const atraso = getDelayIndicator(item);
 
-          return (
-            <Card key={item.id} className="overflow-hidden">
-              <div className="p-5 space-y-5">
-                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="bg-slate-100 text-slate-700 border-slate-200">OS {item.os || "-"}</Badge>
-                      <Badge className={
-                        status === "Atrasado" ? "bg-rose-100 text-rose-700 border-rose-200" :
-                        status === "Entregue" ? "bg-sky-100 text-sky-700 border-sky-200" :
-                        status === "Em execução" ? "bg-amber-100 text-amber-700 border-amber-200" :
-                        "bg-emerald-100 text-emerald-700 border-emerald-200"
-                      }>{status}</Badge>
-                      {atraso !== "-" ? <Badge className="bg-rose-50 text-rose-700 border-rose-200">Atraso: {atraso}</Badge> : null}
+            const statusClassName =
+              status === "Atrasado"
+                ? "bg-rose-100 text-rose-700 border-rose-200"
+                : status === "Entregue"
+                ? "bg-sky-100 text-sky-700 border-sky-200"
+                : status === "Em execução"
+                ? "bg-amber-100 text-amber-700 border-amber-200"
+                : "bg-emerald-100 text-emerald-700 border-emerald-200";
+
+            return (
+              <Card key={item.id} className="overflow-hidden">
+                <div className="p-5 space-y-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="bg-slate-100 text-slate-700 border-slate-200">OS {item.os || "-"}</Badge>
+                        <Badge className={statusClassName}>{status}</Badge>
+                        {atraso !== "-" ? <Badge className="bg-rose-100 text-rose-700 border-rose-200">Atraso: {atraso}</Badge> : null}
+                      </div>
+                      <h3 className="mt-3 text-lg font-semibold tracking-tight text-slate-900">{item.service || "Serviço não informado"}</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span>
+                      </p>
                     </div>
 
-                    <h3 className="mt-3 text-xl font-semibold tracking-tight text-slate-900">{item.service || "-"}</h3>
-                    <p className="mt-2 text-sm text-slate-500">Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span></p>
+                    <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 min-w-[180px]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Custo total</p>
+                      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                        {formatCurrencyBR(item.totalCost || item.cost)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 xl:min-w-[320px] xl:justify-end">
-                    <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 min-w-[180px]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Custo total</p>
-                      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{formatCurrencyBR(item.totalCost || item.cost)}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">Data limite</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateBR(item.limitDate)}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="h-10 px-4 rounded-xl" onClick={() => onEdit(item)}>Editar</Button>
-                      <Button variant="danger" className="h-10 px-4 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">Responsável</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{item.responsible || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">Datas</p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        Solicitação: <span className="font-medium">{formatDateBR(item.requestDate)}</span>
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        Entrega: <span className="font-medium">{formatDateBR(item.deliveryDate)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+                    <p className="text-sm text-slate-500">
+                      Os cálculos de mão de obra, materiais e BDI permanecem no formulário da OS.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" className="h-10 px-4 rounded-xl" onClick={() => onEdit(item)}>
+                        Editar
+                      </Button>
+                      <Button variant="danger" className="h-10 px-4 rounded-xl" onClick={() => onDelete(item.id)}>
+                        Excluir
+                      </Button>
                     </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Data solicitação</p><p className="mt-2 text-sm font-semibold text-slate-900">{formatDateBR(item.requestDate)}</p></div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Data limite</p><p className="mt-2 text-sm font-semibold text-slate-900">{formatDateBR(item.limitDate)}</p></div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Responsável</p><p className="mt-2 text-sm font-semibold text-slate-900">{item.responsible || "-"}</p></div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Entrega</p><p className="mt-2 text-sm font-semibold text-slate-900">{formatDateBR(item.deliveryDate)}</p></div>
-                </div>
-              </div>
-            </Card>
-          );
-        }) : (
-          <Card><div className="px-4 py-10 text-center text-slate-500">Nenhuma manutenção cadastrada para esta obra.</div></Card>
+              </Card>
+            );
+          })
+        ) : (
+          <Card>
+            <div className="p-8 text-center">
+              <p className="text-base font-semibold text-slate-900">Nenhuma manutenção cadastrada para esta obra.</p>
+              <p className="mt-1 text-sm text-slate-500">Cadastre uma nova OS para começar.</p>
+            </div>
+          </Card>
         )}
       </div>
     </div>
@@ -781,10 +932,7 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
 }
 
 export default function App() {
-  const [data, setData] = useState(() => ({
-    ...initialData,
-    maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles),
-  }));
+  const [data, setData] = useState(() => ({ ...initialData, maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles) }));
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [obraId, setObraId] = useState("");
@@ -819,11 +967,13 @@ export default function App() {
       roles: data.roles.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
       maintenanceRoles: data.maintenanceRoles || [],
       stock: data.stock.filter((item) => sameId(item.obraId, obraAtual.id)),
-      maintenance: mergeMaintenanceWithStoredDetails(data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id))),
+      maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)),
       attendance: data.attendance.filter((item) => sameId(item.obraId, obraAtual.id)),
       history: data.history.filter((item) => sameId(item.obraId, obraAtual.id)),
     };
   }, [data, obraAtual]);
+
+  const maintenancePreview = useMemo(() => calculateMaintenanceItem(maintenanceForm), [maintenanceForm]);
 
   const selectedAttendanceRoles = useMemo(() => {
     return filteredData.roles.filter((role) => String(role.companyId) === String(attendanceBatchCompanyId));
@@ -842,12 +992,6 @@ export default function App() {
         .includes(search.toLowerCase())
     );
   }, [filteredData.maintenance, search]);
-
-  const maintenancePreview = useMemo(() => calculateMaintenanceItem(maintenanceForm), [maintenanceForm]);
-
-  useEffect(() => {
-    saveStoredMaintenanceRoles(data.maintenanceRoles || []);
-  }, [data.maintenanceRoles]);
 
   async function fetchAllData() {
     if (!isSupabaseConfigured || !onlineMode) {
@@ -878,7 +1022,7 @@ export default function App() {
         stock: (stockRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
         maintenance: mergeMaintenanceWithStoredDetails((maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service, requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible }))),
         attendance: (attendanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, roleId: row.role_id, qty: row.qty })),
-        history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: row.snapshot?.maintenance || [], attendance: row.snapshot?.attendance || [] })),
+        history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
       };
 
       setData(nextData);
@@ -899,6 +1043,25 @@ export default function App() {
   useEffect(() => {
     fetchAllData();
   }, [onlineMode]);
+
+  useEffect(() => {
+    saveStoredMaintenanceRoles(data.maintenanceRoles || []);
+  }, [data.maintenanceRoles]);
+
+  useEffect(() => {
+    const details = {};
+    (data.maintenance || []).forEach((item) => {
+      details[item.id] = {
+        labor: item.labor || [],
+        materialCost: Number(item.materialCost || 0),
+        bdi: Number(item.bdi || 0),
+        laborTotal: Number(item.laborTotal || 0),
+        subtotal: Number(item.subtotal || 0),
+        totalCost: Number(item.totalCost || item.cost || 0),
+      };
+    });
+    saveStoredMaintenanceDetails(details);
+  }, [data.maintenance]);
 
   async function addObra() {
     const payload = { id: generateUuid(), ...obraForm };
@@ -938,6 +1101,50 @@ export default function App() {
     }
     setRoleModal(false);
     setRoleForm({ companyId: "", name: "" });
+  }
+
+  function addMaintenanceRole() {
+    const payload = { id: generateUuid(), name: maintenanceRoleForm.name.trim(), daily: Number(maintenanceRoleForm.daily || 0) };
+    if (!payload.name) return;
+    setData((prev) => ({ ...prev, maintenanceRoles: [...(prev.maintenanceRoles || []), payload].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")) }));
+    setMaintenanceRoleForm({ name: "", daily: 0 });
+  }
+
+  function deleteMaintenanceRole(id) {
+    setData((prev) => ({
+      ...prev,
+      maintenanceRoles: (prev.maintenanceRoles || []).filter((item) => !sameId(item.id, id)),
+      maintenance: prev.maintenance.map((item) =>
+        calculateMaintenanceItem({
+          ...item,
+          labor: (item.labor || []).filter((line) => !sameId(line.roleId, id)),
+        })
+      ),
+    }));
+  }
+
+  function addMaintenanceLaborLine() {
+    setMaintenanceForm((prev) => ({ ...prev, labor: [...(prev.labor || []), createEmptyLaborEntry()] }));
+  }
+
+  function removeMaintenanceLaborLine(lineId) {
+    setMaintenanceForm((prev) => ({ ...prev, labor: (prev.labor || []).filter((line) => line.id !== lineId) }));
+  }
+
+  function updateMaintenanceLaborLine(lineId, patch) {
+    setMaintenanceForm((prev) => ({
+      ...prev,
+      labor: (prev.labor || []).map((line) => (line.id === lineId ? { ...line, ...patch } : line)),
+    }));
+  }
+
+  function handleMaintenanceRoleSelection(lineId, roleId) {
+    const selectedRole = (data.maintenanceRoles || []).find((role) => sameId(role.id, roleId));
+    updateMaintenanceLaborLine(lineId, {
+      roleId,
+      roleName: selectedRole?.name || "",
+      daily: Number(selectedRole?.daily || 0),
+    });
   }
 
   async function addAttendanceRecord() {
@@ -998,45 +1205,6 @@ export default function App() {
     setMaintenanceModal(true);
   }
 
-  function addMaintenanceRole() {
-    const payload = { id: generateUuid(), name: maintenanceRoleForm.name.trim(), daily: Number(maintenanceRoleForm.daily || 0) };
-    if (!payload.name) return;
-    setData((prev) => ({ ...prev, maintenanceRoles: [...(prev.maintenanceRoles || []), payload].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")) }));
-    setMaintenanceRoleForm({ name: "", daily: 0 });
-  }
-
-  function deleteMaintenanceRole(id) {
-    setData((prev) => ({
-      ...prev,
-      maintenanceRoles: (prev.maintenanceRoles || []).filter((item) => !sameId(item.id, id)),
-      maintenance: (prev.maintenance || []).map((item) => calculateMaintenanceItem({ ...item, labor: (item.labor || []).filter((line) => !sameId(line.roleId, id)) })),
-    }));
-  }
-
-  function addMaintenanceLaborLine() {
-    setMaintenanceForm((prev) => ({ ...prev, labor: [...(prev.labor || []), createEmptyLaborEntry()] }));
-  }
-
-  function removeMaintenanceLaborLine(lineId) {
-    setMaintenanceForm((prev) => ({ ...prev, labor: (prev.labor || []).filter((line) => line.id !== lineId) }));
-  }
-
-  function updateMaintenanceLaborLine(lineId, patch) {
-    setMaintenanceForm((prev) => ({
-      ...prev,
-      labor: (prev.labor || []).map((line) => (line.id === lineId ? { ...line, ...patch } : line)),
-    }));
-  }
-
-  function handleMaintenanceRoleSelection(lineId, roleId) {
-    const selectedRole = (data.maintenanceRoles || []).find((role) => sameId(role.id, roleId));
-    updateMaintenanceLaborLine(lineId, {
-      roleId,
-      roleName: selectedRole?.name || "",
-      daily: Number(selectedRole?.daily || 0),
-    });
-  }
-
   function openMaintenanceEditor(item) {
     const normalized = calculateMaintenanceItem(item);
     setEditingMaintenanceId(item.id);
@@ -1061,78 +1229,51 @@ export default function App() {
   }
 
   async function addMaintenanceOrder() {
-    const normalized = calculateMaintenanceItem({
-      id: editingMaintenanceId || generateId(),
-      obraId,
-      ...maintenanceForm,
-    });
-
-    const dbPayload = {
-      id: normalized.id,
-      obraId: normalized.obraId,
-      os: normalized.os,
-      service: normalized.service,
-      requester: normalized.requester,
-      requestDate: normalized.requestDate,
-      realizationDate: normalized.realizationDate || null,
-      deliveryDate: normalized.deliveryDate || null,
-      cost: Number(normalized.totalCost || normalized.cost || 0),
-      limitDate: normalized.limitDate,
-      responsible: normalized.responsible,
-      labor: normalized.labor,
-      materialCost: Number(normalized.materialCost || 0),
-      bdi: Number(normalized.bdi || 0),
-      laborTotal: Number(normalized.laborTotal || 0),
-      subtotal: Number(normalized.subtotal || 0),
-      totalCost: Number(normalized.totalCost || 0),
-    };
-
-    upsertStoredMaintenanceDetail(dbPayload);
-
+    const computed = calculateMaintenanceItem({ id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm });
     if (onlineMode && isSupabaseConfigured) {
       if (editingMaintenanceId) {
         const { error } = await supabase
           .from("maintenance_orders")
           .update({
-            obra_id: dbPayload.obraId,
-            os: dbPayload.os,
-            service: dbPayload.service,
-            requester: dbPayload.requester,
-            request_date: dbPayload.requestDate,
-            realization_date: dbPayload.realizationDate,
-            delivery_date: dbPayload.deliveryDate,
-            cost: Number(dbPayload.totalCost || dbPayload.cost || 0),
-            limit_date: dbPayload.limitDate,
-            responsible: dbPayload.responsible,
+            obra_id: computed.obraId,
+            os: computed.os,
+            service: computed.service,
+            requester: computed.requester,
+            request_date: computed.requestDate,
+            realization_date: computed.realizationDate || null,
+            delivery_date: computed.deliveryDate || null,
+            cost: Number(computed.totalCost || 0),
+            limit_date: computed.limitDate,
+            responsible: computed.responsible,
           })
           .eq("id", editingMaintenanceId);
         if (error) return setErrorMessage(error.message);
       } else {
         const { error } = await supabase.from("maintenance_orders").insert({
-          id: dbPayload.id,
-          obra_id: dbPayload.obraId,
-          os: dbPayload.os,
-          service: dbPayload.service,
-          requester: dbPayload.requester,
-          request_date: dbPayload.requestDate,
-          realization_date: dbPayload.realizationDate,
-          delivery_date: dbPayload.deliveryDate,
-          cost: Number(dbPayload.totalCost || dbPayload.cost || 0),
-          limit_date: dbPayload.limitDate,
-          responsible: dbPayload.responsible,
+          id: computed.id,
+          obra_id: computed.obraId,
+          os: computed.os,
+          service: computed.service,
+          requester: computed.requester,
+          request_date: computed.requestDate,
+          realization_date: computed.realizationDate || null,
+          delivery_date: computed.deliveryDate || null,
+          cost: Number(computed.totalCost || 0),
+          limit_date: computed.limitDate,
+          responsible: computed.responsible,
         });
         if (error) return setErrorMessage(error.message);
       }
+      upsertStoredMaintenanceDetail(computed);
       await fetchAllData();
     } else {
       setData((prev) => ({
         ...prev,
         maintenance: editingMaintenanceId
-          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? dbPayload : item)
-          : [...prev.maintenance, dbPayload],
+          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? computed : item)
+          : [...prev.maintenance, computed],
       }));
     }
-
     closeMaintenanceModal();
   }
 
@@ -1223,7 +1364,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-        setData(parsed.data);
+        setData({ ...parsed.data, maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles), maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)) });
         if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
       } catch (error) {
         setErrorMessage("Não foi possível ler o backup. Verifique se é um JSON exportado pelo sistema.");
@@ -1233,10 +1374,12 @@ export default function App() {
   }
 
   function resetData() {
+    saveStoredMaintenanceRoles(initialData.maintenanceRoles);
+    saveStoredMaintenanceDetails({});
     setData(initialData);
     setCurrentPage("dashboard");
     setSearch("");
-    setObraId(data.obras[0]?.id || "");
+    setObraId(initialData.obras[0]?.id || "");
     setErrorMessage("");
   }
 
@@ -1280,7 +1423,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onManageRoles={() => setMaintenanceRoleModal(true)} maintenanceRolesCount={(data.maintenanceRoles || []).length} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onManageRoles={() => setMaintenanceRoleModal(true)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -1362,6 +1505,7 @@ export default function App() {
         <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setRoleModal(false)}>Cancelar</Button><Button onClick={addRole} disabled={!roleForm.companyId || !roleForm.name || !obraAtual}>Salvar</Button></div>
       </Modal>
 
+
       <Modal open={maintenanceRoleModal} title="Cargos da manutenção" onClose={() => setMaintenanceRoleModal(false)}>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1fr_auto] gap-4 items-end">
@@ -1431,12 +1575,7 @@ export default function App() {
             <CardHeader
               title="Composição da mão de obra"
               description="Cada linha calcula: horas × (diária ÷ 8)"
-              right={
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={() => setMaintenanceRoleModal(true)}><Briefcase className="h-4 w-4" /> Novo cargo</Button>
-                  <Button variant="outline" onClick={addMaintenanceLaborLine}><Plus className="h-4 w-4" /> Adicionar cargo</Button>
-                </div>
-              }
+              right={<Button variant="outline" onClick={addMaintenanceLaborLine}><Plus className="h-4 w-4" /> Adicionar cargo</Button>}
             />
             <div className="p-5 space-y-4">
               {(maintenanceForm.labor || []).length ? (maintenanceForm.labor || []).map((line) => {
@@ -1454,15 +1593,42 @@ export default function App() {
                           ]}
                         />
                       </Field>
-                      <Field label="Diária (R$)"><Input type="number" value={previewLine.daily} readOnly /></Field>
-                      <Field label="Valor/hora (R$)"><Input type="number" value={previewLine.hourly.toFixed(2)} readOnly /></Field>
-                      <Field label="Horas consumidas"><Input type="number" step="0.01" min="0" value={line.hours} onChange={(e) => updateMaintenanceLaborLine(line.id, { hours: e.target.value })} /></Field>
-                      <Button variant="danger" className="w-full xl:w-auto" onClick={() => removeMaintenanceLaborLine(line.id)} disabled={(maintenanceForm.labor || []).length === 1}><Trash2 className="h-4 w-4" /> Remover</Button>
+
+                      <Field label="Diária (R$)">
+                        <Input type="number" value={previewLine.daily} readOnly />
+                      </Field>
+
+                      <Field label="Valor/hora (R$)">
+                        <Input type="number" value={previewLine.hourly.toFixed(2)} readOnly />
+                      </Field>
+
+                      <Field label="Horas consumidas">
+                        <Input type="number" step="0.01" min="0" value={line.hours} onChange={(e) => updateMaintenanceLaborLine(line.id, { hours: e.target.value })} />
+                      </Field>
+
+                      <Button
+                        variant="danger"
+                        className="w-full xl:w-auto"
+                        onClick={() => removeMaintenanceLaborLine(line.id)}
+                        disabled={(maintenanceForm.labor || []).length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" /> Remover
+                      </Button>
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                      <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Subtotal da linha</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.subtotal)}</p>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Diária</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.daily)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Valor/hora</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.hourly)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Subtotal da linha</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrencyBR(previewLine.subtotal)}</p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1474,30 +1640,17 @@ export default function App() {
 
               {!data.maintenanceRoles?.length ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Nenhum cargo cadastrado ainda. Use o botão <strong>Novo cargo</strong> para informar o nome e a diária.
+                  Cadastre os cargos da manutenção antes de lançar a composição da OS.
                 </div>
               ) : null}
             </div>
           </Card>
 
-          <Card>
-            <div className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Total calculado da OS</p>
-                <p className={cn("mt-2 text-[2rem] font-bold tracking-tight", maintenancePreview.totalCost > 0 ? "text-rose-700" : "text-emerald-700")}>
-                  {formatCurrencyBR(maintenancePreview.totalCost)}
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  O sistema calcula automaticamente com base nos cargos, horas, materiais e BDI informados no formulário.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:min-w-[520px]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Mão de obra</p><p className="mt-2 text-lg font-semibold text-slate-900">{formatCurrencyBR(maintenancePreview.laborTotal)}</p></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Materiais</p><p className="mt-2 text-lg font-semibold text-slate-900">{formatCurrencyBR(maintenanceForm.materialCost)}</p></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"><p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">BDI</p><p className="mt-2 text-lg font-semibold text-slate-900">{Number(maintenanceForm.bdi || 0).toFixed(2)}%</p></div>
-              </div>
-            </div>
-          </Card>
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <HomeStatCard title="Mão de obra" value={formatCurrencyBR(maintenancePreview.laborTotal)} subtitle="Soma das linhas de cargo" icon={Users} tone={maintenancePreview.laborTotal > 0 ? "default" : "success"} />
+            <HomeStatCard title="Subtotal" value={formatCurrencyBR(maintenancePreview.subtotal)} subtitle="Mão de obra + materiais" icon={Package} tone={maintenancePreview.subtotal > 0 ? "default" : "success"} />
+            <HomeStatCard title="Total com BDI" value={formatCurrencyBR(maintenancePreview.totalCost)} subtitle={`BDI aplicado: ${Number(maintenanceForm.bdi || 0).toFixed(2)}%`} icon={Briefcase} tone={maintenancePreview.totalCost > 0 ? "danger" : "success"} />
+          </section>
 
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="outline" onClick={closeMaintenanceModal}>Cancelar</Button>
