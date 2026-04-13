@@ -692,7 +692,7 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, maintenanceRolesCount }) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
@@ -725,6 +725,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <Button variant="outline" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
               <Button variant="outline" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button onClick={onAdd}>Nova manutenção</Button>
               <ReturnHomeButton onClick={onBack} />
@@ -967,6 +968,78 @@ async function exportDailyPdf(day, companies, roles, obraNome) {
   doc.save(`relatorio-geral-${day.date}.pdf`);
 }
 
+
+async function exportMaintenanceLandscapePdf(items, obraAtual) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const generatedAt = getDateTimeBRNoSeconds();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RELATÓRIO DE MANUTENÇÕES - NERO CONSTRUÇÕES", 14, 16);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  const totalValue = (items || []).reduce((acc, item) => acc + Number(item.totalCost || item.cost || 0), 0);
+
+  doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 14, 24);
+  doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
+  doc.text(`Valor total do momento: ${formatCurrencyBR(totalValue)}`, 14, 30);
+  doc.line(14, 34, pageWidth - 14, 34);
+
+  const sorted = [...(items || [])].sort((a, b) => {
+    const getOs = (value) => {
+      const match = String(value || "").match(/\d+/);
+      return match ? Number(match[0]) : 0;
+    };
+    return getOs(a.os) - getOs(b.os);
+  });
+
+  const body = sorted.map((item) => [
+    item.os || "-",
+    item.service || "-",
+    item.requester || "-",
+    formatDateBR(item.requestDate),
+    formatDateBR(item.deliveryDate),
+    formatCurrencyBR(item.totalCost || item.cost || 0),
+    item.responsible || "-",
+    getDelayIndicator(item),
+  ]);
+
+  autoTable(doc, {
+    startY: 40,
+    margin: { left: 14, right: 14 },
+    head: [["OS", "SERVIÇO", "SOLICITANTE", "DATA DA SOLICIT.", "DATA DA ENTREGA", "VALOR", "RESPONS.", "ATRASO"]],
+    body: body.length ? body : [["-", "Sem manutenções", "-", "-", "-", "-", "-", "-"]],
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 9,
+      cellPadding: 2,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [16, 185, 129],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 86 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 26, halign: "center" },
+      4: { cellWidth: 26, halign: "center" },
+      5: { cellWidth: 28, halign: "right" },
+      6: { cellWidth: 30 },
+      7: { cellWidth: 18, halign: "center" },
+    },
+  });
+
+  addPageNumbers(doc);
+  doc.save(`relatorio-manutencoes-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+}
+
 function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
   const [selected, setSelected] = useState(null);
   return (
@@ -1096,26 +1169,47 @@ export default function App() {
     setLoading(true);
     setErrorMessage("");
     try {
-      const [obrasRes, companiesRes, rolesRes, stockRes, maintenanceRes, attendanceRes, historyRes] = await Promise.all([
+      const [obrasRes, companiesRes, rolesRes, maintenanceRolesRes, stockRes, maintenanceRes, attendanceRes, historyRes] = await Promise.all([
         supabase.from("obras").select("*").order("id", { ascending: true }),
         supabase.from("companies").select("*").order("id", { ascending: true }),
         supabase.from("roles").select("*").order("id", { ascending: true }),
+        supabase.from("maintenance_roles").select("*").order("name", { ascending: true }),
         supabase.from("stock_items").select("*").order("id", { ascending: true }),
         supabase.from("maintenance_orders").select("*").order("id", { ascending: true }),
         supabase.from("attendance_records").select("*").order("id", { ascending: true }),
         supabase.from("history_snapshots").select("*").order("date", { ascending: false }),
       ]);
 
-      const errors = [obrasRes.error, companiesRes.error, rolesRes.error, stockRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
+      const errors = [obrasRes.error, companiesRes.error, rolesRes.error, maintenanceRolesRes.error, stockRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
       if (errors.length) throw errors[0];
 
       const nextData = {
         obras: (obrasRes.data || []).map((row) => ({ id: row.id, nome: row.nome, cliente: row.cliente, local: row.local, status: row.status, dataInicio: row.data_inicio, observacao: row.observacao })),
         companies: (companiesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, city: row.city })),
         roles: (rolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, name: row.name })),
-        maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles),
+        maintenanceRoles: (maintenanceRolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, daily: Number(row.daily || 0) })),
         stock: (stockRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
-        maintenance: mergeMaintenanceWithStoredDetails((maintenanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, os: row.os, service: row.service, requester: row.requester, requestDate: row.request_date, realizationDate: row.realization_date, deliveryDate: row.delivery_date, cost: row.cost, limitDate: row.limit_date, responsible: row.responsible }))),
+        maintenance: (maintenanceRes.data || []).map((row) => calculateMaintenanceItem({
+          id: row.id,
+          obraId: row.obra_id,
+          os: row.os,
+          service: row.service,
+          requester: row.requester,
+          requestDate: row.request_date,
+          realizationDate: row.realization_date,
+          deliveryDate: row.delivery_date,
+          cost: row.cost,
+          limitDate: row.limit_date,
+          responsible: row.responsible,
+          compositionType: row.composition_type,
+          labor: row.labor || [],
+          outsourcedServiceCost: row.outsourced_service_cost,
+          materialCost: row.material_cost,
+          bdi: row.bdi,
+          laborTotal: row.labor_total,
+          subtotal: row.subtotal,
+          totalCost: row.total_cost,
+        })),
         attendance: (attendanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, roleId: row.role_id, qty: row.qty })),
         history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
       };
@@ -1124,8 +1218,8 @@ export default function App() {
       const localMaintenanceById = new Map((localBackup?.maintenance || []).map((item) => [String(item.id), item]));
       const mergedData = {
         ...nextData,
-        maintenanceRoles: localBackup?.maintenanceRoles?.length ? localBackup.maintenanceRoles : nextData.maintenanceRoles,
-        maintenance: nextData.maintenance.map((item) => calculateMaintenanceItem({ ...item, ...(localMaintenanceById.get(String(item.id)) || {}) })),
+        maintenanceRoles: nextData.maintenanceRoles.length ? nextData.maintenanceRoles : (localBackup?.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles)),
+        maintenance: nextData.maintenance.map((item) => calculateMaintenanceItem({ ...(localMaintenanceById.get(String(item.id)) || {}), ...item })),
       };
       setData(persistAppSnapshot(mergedData));
       setObraId((current) => {
@@ -1149,6 +1243,130 @@ export default function App() {
   useEffect(() => {
     persistAppSnapshot(data);
   }, [data]);
+
+
+  async function syncDataToSupabase(appData) {
+    if (!onlineMode || !isSupabaseConfigured) return;
+
+    const normalized = createPersistableAppData(appData);
+
+    const obrasRows = (normalized.obras || []).map((row) => ({
+      id: row.id,
+      nome: row.nome,
+      cliente: row.cliente,
+      local: row.local,
+      status: row.status,
+      data_inicio: row.dataInicio,
+      observacao: row.observacao,
+    }));
+
+    const companiesRows = (normalized.companies || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId || null,
+      name: row.name,
+      city: row.city,
+    }));
+
+    const rolesRows = (normalized.roles || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId || null,
+      company_id: row.companyId,
+      name: row.name,
+    }));
+
+    const maintenanceRolesRows = (normalized.maintenanceRoles || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId || null,
+      name: row.name,
+      daily: Number(row.daily || 0),
+    }));
+
+    const stockRows = (normalized.stock || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId,
+      item: row.item,
+      unit: row.unit,
+      quantity: Number(row.quantity || 0),
+      min_quantity: Number(row.min || 0),
+      category: row.category,
+      invoice: row.invoice,
+      price: Number(row.price || 0),
+    }));
+
+    const maintenanceRows = (normalized.maintenance || []).map((row) => {
+      const item = calculateMaintenanceItem(row);
+      return {
+        id: item.id,
+        obra_id: item.obraId,
+        os: item.os,
+        service: item.service,
+        requester: item.requester,
+        request_date: item.requestDate,
+        realization_date: item.realizationDate || null,
+        delivery_date: item.deliveryDate || null,
+        cost: Number(item.totalCost || item.cost || 0),
+        limit_date: item.limitDate,
+        responsible: item.responsible,
+        composition_type: item.compositionType === "outsourced" ? "outsourced" : "own",
+        labor: item.labor || [],
+        outsourced_service_cost: Number(item.outsourcedServiceCost || 0),
+        material_cost: Number(item.materialCost || 0),
+        bdi: Number(item.bdi || 0),
+        labor_total: Number(item.laborTotal || 0),
+        subtotal: Number(item.subtotal || 0),
+        total_cost: Number(item.totalCost || item.cost || 0),
+      };
+    });
+
+    const attendanceRows = (normalized.attendance || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId,
+      company_id: row.companyId,
+      role_id: row.roleId,
+      qty: Number(row.qty || 0),
+    }));
+
+    const historyRows = (normalized.history || []).map((row) => ({
+      id: row.id,
+      obra_id: row.obraId,
+      date: row.date,
+      obra_nome: row.obraName,
+      snapshot: { stock: row.stock || [], maintenance: row.maintenance || [], attendance: row.attendance || [] },
+    }));
+
+    if (obrasRows.length) {
+      const { error } = await supabase.from("obras").upsert(obrasRows);
+      if (error) throw error;
+    }
+    if (companiesRows.length) {
+      const { error } = await supabase.from("companies").upsert(companiesRows);
+      if (error) throw error;
+    }
+    if (rolesRows.length) {
+      const { error } = await supabase.from("roles").upsert(rolesRows);
+      if (error) throw error;
+    }
+    if (maintenanceRolesRows.length) {
+      const { error } = await supabase.from("maintenance_roles").upsert(maintenanceRolesRows);
+      if (error) throw error;
+    }
+    if (stockRows.length) {
+      const { error } = await supabase.from("stock_items").upsert(stockRows);
+      if (error) throw error;
+    }
+    if (maintenanceRows.length) {
+      const { error } = await supabase.from("maintenance_orders").upsert(maintenanceRows);
+      if (error) throw error;
+    }
+    if (attendanceRows.length) {
+      const { error } = await supabase.from("attendance_records").upsert(attendanceRows);
+      if (error) throw error;
+    }
+    if (historyRows.length) {
+      const { error } = await supabase.from("history_snapshots").upsert(historyRows);
+      if (error) throw error;
+    }
+  }
 
   async function addObra() {
     const payload = { id: generateUuid(), ...obraForm };
@@ -1190,8 +1408,8 @@ export default function App() {
     setRoleForm({ companyId: "", name: "" });
   }
 
-  function addMaintenanceRole() {
-    const payload = { id: generateUuid(), name: maintenanceRoleForm.name.trim(), daily: Number(maintenanceRoleForm.daily || 0) };
+  async function addMaintenanceRole() {
+    const payload = { id: generateUuid(), obraId, name: maintenanceRoleForm.name.trim(), daily: Number(maintenanceRoleForm.daily || 0) };
     if (!payload.name) return;
     const duplicate = (data.maintenanceRoles || []).some((role) => role.name.trim().toLowerCase() === payload.name.toLowerCase());
     if (duplicate) {
@@ -1199,12 +1417,31 @@ export default function App() {
       return;
     }
     setErrorMessage("");
-    setData((prev) => ({ ...prev, maintenanceRoles: [...(prev.maintenanceRoles || []), payload].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")) }));
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase.from("maintenance_roles").insert({
+        id: payload.id,
+        obra_id: payload.obraId || null,
+        name: payload.name,
+        daily: payload.daily,
+      });
+      if (error) return setErrorMessage(error.message);
+    }
+
+    commitDataUpdate((prev) => ({
+      ...prev,
+      maintenanceRoles: [...(prev.maintenanceRoles || []), payload].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    }));
     setMaintenanceRoleForm({ name: "", daily: 0 });
   }
 
-  function deleteMaintenanceRole(id) {
-    setData((prev) => ({
+  async function deleteMaintenanceRole(id) {
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase.from("maintenance_roles").delete().eq("id", id);
+      if (error) return setErrorMessage(error.message);
+    }
+
+    commitDataUpdate((prev) => ({
       ...prev,
       maintenanceRoles: (prev.maintenanceRoles || []).filter((item) => !sameId(item.id, id)),
       maintenance: prev.maintenance.map((item) =>
@@ -1351,6 +1588,14 @@ export default function App() {
             cost: Number(computed.totalCost || 0),
             limit_date: computed.limitDate,
             responsible: computed.responsible,
+            composition_type: computed.compositionType,
+            labor: computed.labor || [],
+            outsourced_service_cost: Number(computed.outsourcedServiceCost || 0),
+            material_cost: Number(computed.materialCost || 0),
+            bdi: Number(computed.bdi || 0),
+            labor_total: Number(computed.laborTotal || 0),
+            subtotal: Number(computed.subtotal || 0),
+            total_cost: Number(computed.totalCost || 0),
           })
           .eq("id", editingMaintenanceId);
         if (error) return setErrorMessage(error.message);
@@ -1367,6 +1612,14 @@ export default function App() {
           cost: Number(computed.totalCost || 0),
           limit_date: computed.limitDate,
           responsible: computed.responsible,
+          composition_type: computed.compositionType,
+          labor: computed.labor || [],
+          outsourced_service_cost: Number(computed.outsourcedServiceCost || 0),
+          material_cost: Number(computed.materialCost || 0),
+          bdi: Number(computed.bdi || 0),
+          labor_total: Number(computed.laborTotal || 0),
+          subtotal: Number(computed.subtotal || 0),
+          total_cost: Number(computed.totalCost || 0),
         });
         if (error) return setErrorMessage(error.message);
       }
@@ -1379,6 +1632,11 @@ export default function App() {
         ? prev.maintenance.map((item) => (sameId(item.id, editingMaintenanceId) ? computed : item))
         : [...prev.maintenance, computed],
     }));
+
+    if (onlineMode && isSupabaseConfigured) {
+      await fetchAllData();
+    }
+
     closeMaintenanceModal();
   }
 
@@ -1433,6 +1691,10 @@ export default function App() {
       ...prev,
       maintenance: prev.maintenance.filter((item) => item.id !== id),
     }));
+
+    if (onlineMode && isSupabaseConfigured) {
+      await fetchAllData();
+    }
   }
 
   async function closeDay() {
@@ -1471,11 +1733,21 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-        const restoredData = { ...parsed.data, maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles), maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)) };
-        setData(restoredData);
-        saveStoredAppData(restoredData);
+        const restoredData = {
+          ...parsed.data,
+          maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles),
+          maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)),
+        };
+
+        setData(persistAppSnapshot(restoredData));
         if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
+
+        if (onlineMode && isSupabaseConfigured) {
+          await syncDataToSupabase(restoredData);
+          await fetchAllData();
+        }
       } catch (error) {
+        console.error(error);
         setErrorMessage("Não foi possível ler o backup. Verifique se é um JSON exportado pelo sistema.");
       }
     };
@@ -1533,7 +1805,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
