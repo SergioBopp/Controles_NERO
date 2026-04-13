@@ -975,9 +975,24 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
   const total = Number(item?.totalCost || item?.cost || 0);
   const generatedAt = getDateTimeBRNoSeconds();
 
+  
+  // LOGO (base64 or URL)
+  const logoUrl = "/logo.png"; // coloque sua logo em public/logo.png
+
+  try {
+    const img = new Image();
+    img.src = logoUrl;
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+    doc.addImage(img, "PNG", 14, 10, 30, 12);
+  } catch {}
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 14, 16);
+  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 50, 16);
+
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
