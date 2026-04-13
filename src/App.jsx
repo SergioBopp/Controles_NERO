@@ -692,7 +692,7 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, maintenanceRolesCount }) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
@@ -966,6 +966,96 @@ async function exportDailyPdf(day, companies, roles, obraNome) {
 
   addPageNumbers(doc);
   doc.save(`relatorio-geral-${day.date}.pdf`);
+}
+
+
+
+async function exportMaintenanceOSPdf(item, obraAtual) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const total = Number(item?.totalCost || item?.cost || 0);
+  const generatedAt = getDateTimeBRNoSeconds();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 14, 16);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(`Obra: ${obraAtual?.nome || "-"}`, 14, 26);
+  doc.text(`Gerado em: ${generatedAt}`, 14, 32);
+  doc.text(`OS: ${item?.os || "-"}`, 14, 40);
+  doc.text(`Serviço: ${item?.service || "-"}`, 14, 46);
+  doc.text(`Solicitante: ${item?.requester || "-"}`, 14, 52);
+  doc.text(`Data da solicitação: ${formatDateBR(item?.requestDate)}`, 14, 58);
+  doc.text(`Data da entrega: ${formatDateBR(item?.deliveryDate)}`, 14, 64);
+  doc.text(`Responsável: ${item?.responsible || "-"}`, 14, 70);
+
+  doc.line(14, 76, 196, 76);
+
+  let y = 84;
+
+  if (item?.compositionType === "outsourced") {
+    doc.setFont("helvetica", "bold");
+    doc.text("SERVIÇO TERCEIRIZADO", 14, y);
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Valor do serviço terceirizado: ${formatCurrencyBR(item?.outsourcedServiceCost || 0)}`, 14, y);
+    y += 10;
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.text("MÃO DE OBRA", 14, y);
+    y += 8;
+    doc.setFont("helvetica", "normal");
+
+    const laborRows = (item?.labor || []).map((l) => [
+      l?.roleName || "-",
+      `${Number(l?.hours || 0)}h`,
+      formatCurrencyBR(l?.hourly || 0),
+      formatCurrencyBR(l?.subtotal || 0),
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: 14, right: 14 },
+      head: [["Cargo", "Horas", "Valor/hora", "Subtotal"]],
+      body: laborRows.length ? laborRows : [["-", "-", "-", "-"]],
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontSize: 10,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [16, 185, 129],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 78 },
+        1: { cellWidth: 22, halign: "center" },
+        2: { cellWidth: 35, halign: "right" },
+        3: { cellWidth: 35, halign: "right" },
+      },
+    });
+
+    y = (doc.lastAutoTable?.finalY || y) + 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("MATERIAIS", 14, y);
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Valor de materiais: ${formatCurrencyBR(item?.materialCost || 0)}`, 14, y);
+    y += 10;
+  }
+
+  doc.line(14, y, 196, y);
+  y += 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(`VALOR TOTAL: ${formatCurrencyBR(total)}`, 14, y);
+
+  doc.save(`OS-${item?.os || "sem-numero"}.pdf`);
 }
 
 
@@ -1805,7 +1895,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
