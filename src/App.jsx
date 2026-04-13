@@ -135,6 +135,62 @@ function getDelayIndicator(item) {
 const MAINTENANCE_ROLES_STORAGE_KEY = "nero_maintenance_roles_v10";
 const MAINTENANCE_DETAILS_STORAGE_KEY = "nero_maintenance_details_v10";
 
+
+const APP_STORAGE_KEY = "nero_app_data_v12";
+
+function getStoredAppData() {
+  const stored = readJsonStorage(APP_STORAGE_KEY, null);
+  if (!stored || typeof stored !== "object") return null;
+  return stored;
+}
+
+function normalizeStoredAppData(stored) {
+  if (!stored || typeof stored !== "object") return null;
+  return {
+    ...initialData,
+    ...stored,
+    maintenanceRoles: Array.isArray(stored.maintenanceRoles) && stored.maintenanceRoles.length
+      ? stored.maintenanceRoles
+      : getStoredMaintenanceRoles(initialData.maintenanceRoles),
+    maintenance: (stored.maintenance || []).map((item) => calculateMaintenanceItem(item)),
+  };
+}
+
+function saveStoredAppData(appData) {
+  writeJsonStorage(APP_STORAGE_KEY, appData);
+}
+
+function createPersistableAppData(appData) {
+  return {
+    ...appData,
+    maintenanceRoles: [...(appData.maintenanceRoles || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR")),
+    maintenance: (appData.maintenance || []).map((item) => calculateMaintenanceItem(item)),
+  };
+}
+
+function persistAppSnapshot(appData) {
+  const normalized = createPersistableAppData(appData);
+  saveStoredMaintenanceRoles(normalized.maintenanceRoles || []);
+
+  const details = {};
+  (normalized.maintenance || []).forEach((item) => {
+    details[item.id] = {
+      compositionType: item.compositionType === "outsourced" ? "outsourced" : "own",
+      labor: item.labor || [],
+      outsourcedServiceCost: Number(item.outsourcedServiceCost || 0),
+      materialCost: Number(item.materialCost || 0),
+      bdi: Number(item.bdi || 0),
+      laborTotal: Number(item.laborTotal || 0),
+      subtotal: Number(item.subtotal || 0),
+      totalCost: Number(item.totalCost || item.cost || 0),
+    };
+  });
+
+  saveStoredMaintenanceDetails(details);
+  saveStoredAppData(normalized);
+  return normalized;
+}
+
 function createEmptyLaborEntry() {
   return { id: generateUuid(), roleId: "", roleName: "", daily: 0, hours: 0 };
 }
@@ -179,30 +235,22 @@ function calculateLaborLine(line) {
   };
 }
 
-
 function calculateMaintenanceItem(item) {
   const compositionType = item?.compositionType === "outsourced" ? "outsourced" : "own";
-
-  const labor =
-    compositionType === "own"
-      ? (item?.labor || [])
-          .map(calculateLaborLine)
-          .filter((line) => line.roleId || line.roleName || line.hours || line.daily)
-      : [];
-
+  const labor = compositionType === "own"
+    ? (item?.labor || []).map(calculateLaborLine).filter((line) => line.roleId || line.roleName || line.hours || line.daily)
+    : [];
   const laborTotal = labor.reduce((acc, line) => acc + Number(line.subtotal || 0), 0);
   const materialCost = compositionType === "own" ? Number(item?.materialCost || 0) : 0;
   const outsourcedServiceCost = compositionType === "outsourced" ? Number(item?.outsourcedServiceCost || 0) : 0;
   const bdi = Number(item?.bdi || 0);
-
-  const subtotal =
-    compositionType === "outsourced"
-      ? outsourcedServiceCost
-      : laborTotal + materialCost;
+  const subtotal = compositionType === "outsourced" ? outsourcedServiceCost : laborTotal + materialCost;
 
   const calculated = subtotal * (1 + bdi / 100);
-  const minimumApplied = calculated < 100;
-  const totalCost = minimumApplied ? 100 : calculated;
+
+// mínimo de R$ 100
+const totalCost = Math.max(100, calculated);
+
 
   return {
     ...item,
@@ -215,10 +263,8 @@ function calculateMaintenanceItem(item) {
     subtotal,
     totalCost,
     cost: totalCost,
-    minimumApplied,
   };
 }
-
 
 function readJsonStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
@@ -655,12 +701,14 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
   };
 
   const sortedItems = useMemo(() => {
+    const parseOsNumber = (value) => {
+      const match = String(value || "").match(/\d+/);
+      return match ? Number(match[0]) : 0;
+    };
+
     return [...items].sort((a, b) => {
-      const diff = getMaintenanceSortWeight(a) - getMaintenanceSortWeight(b);
-      if (diff !== 0) return diff;
-      const limitA = String(a.limitDate || "9999-12-31");
-      const limitB = String(b.limitDate || "9999-12-31");
-      if (limitA !== limitB) return limitA.localeCompare(limitB);
+      const osDiff = parseOsNumber(b.os) - parseOsNumber(a.os);
+      if (osDiff !== 0) return osDiff;
       return String(b.requestDate || "").localeCompare(String(a.requestDate || ""));
     });
   }, [items]);
@@ -715,8 +763,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                     <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 min-w-[220px]">
                       <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Custo total</p>
                       <p className="mt-2 text-2xl font-extrabold text-slate-900">{formatCurrencyBR(item.totalCost || item.cost || 0)}</p>
-                      <p className="mt-1 text-sm text-slate-500">BDI: {Number(item.bdi || 0).toFixed(2)}%</p>
-                    </div>
+                                          </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -960,7 +1007,10 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
 }
 
 export default function App() {
-  const [data, setData] = useState(() => ({ ...initialData, maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles) }));
+  const [data, setData] = useState(() => {
+    const stored = normalizeStoredAppData(getStoredAppData());
+    return stored || { ...initialData, maintenanceRoles: getStoredMaintenanceRoles(initialData.maintenanceRoles) };
+  });
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [obraId, setObraId] = useState("");
@@ -986,6 +1036,13 @@ export default function App() {
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
   const [selectedMaintenanceDetails, setSelectedMaintenanceDetails] = useState(null);
+
+  function commitDataUpdate(updater) {
+    setData((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      return persistAppSnapshot(next);
+    });
+  }
 
   const obraAtual = useMemo(() => data.obras.find((obra) => sameId(obra.id, obraId)) || null, [data.obras, obraId]);
 
@@ -1024,6 +1081,15 @@ export default function App() {
 
   async function fetchAllData() {
     if (!isSupabaseConfigured || !onlineMode) {
+      const stored = normalizeStoredAppData(getStoredAppData());
+      if (stored) {
+        setData(persistAppSnapshot(stored));
+        setObraId((current) => {
+          const currentExists = stored.obras.some((obra) => sameId(obra.id, current));
+          if (currentExists) return current;
+          return stored.obras[0]?.id ?? "";
+        });
+      }
       setLoading(false);
       return;
     }
@@ -1054,7 +1120,14 @@ export default function App() {
         history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
       };
 
-      setData(nextData);
+      const localBackup = normalizeStoredAppData(getStoredAppData());
+      const localMaintenanceById = new Map((localBackup?.maintenance || []).map((item) => [String(item.id), item]));
+      const mergedData = {
+        ...nextData,
+        maintenanceRoles: localBackup?.maintenanceRoles?.length ? localBackup.maintenanceRoles : nextData.maintenanceRoles,
+        maintenance: nextData.maintenance.map((item) => calculateMaintenanceItem({ ...item, ...(localMaintenanceById.get(String(item.id)) || {}) })),
+      };
+      setData(persistAppSnapshot(mergedData));
       setObraId((current) => {
         const currentExists = nextData.obras.some((obra) => sameId(obra.id, current));
         if (currentExists) return current;
@@ -1074,25 +1147,8 @@ export default function App() {
   }, [onlineMode]);
 
   useEffect(() => {
-    saveStoredMaintenanceRoles(data.maintenanceRoles || []);
-  }, [data.maintenanceRoles]);
-
-  useEffect(() => {
-    const details = {};
-    (data.maintenance || []).forEach((item) => {
-      details[item.id] = {
-        compositionType: item.compositionType === "outsourced" ? "outsourced" : "own",
-        labor: item.labor || [],
-        outsourcedServiceCost: Number(item.outsourcedServiceCost || 0),
-        materialCost: Number(item.materialCost || 0),
-        bdi: Number(item.bdi || 0),
-        laborTotal: Number(item.laborTotal || 0),
-        subtotal: Number(item.subtotal || 0),
-        totalCost: Number(item.totalCost || item.cost || 0),
-      };
-    });
-    saveStoredMaintenanceDetails(details);
-  }, [data.maintenance]);
+    persistAppSnapshot(data);
+  }, [data]);
 
   async function addObra() {
     const payload = { id: generateUuid(), ...obraForm };
@@ -1279,6 +1335,7 @@ export default function App() {
 
   async function addMaintenanceOrder() {
     const computed = calculateMaintenanceItem({ id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm });
+
     if (onlineMode && isSupabaseConfigured) {
       if (editingMaintenanceId) {
         const { error } = await supabase
@@ -1313,16 +1370,15 @@ export default function App() {
         });
         if (error) return setErrorMessage(error.message);
       }
-      upsertStoredMaintenanceDetail(computed);
-      await fetchAllData();
-    } else {
-      setData((prev) => ({
-        ...prev,
-        maintenance: editingMaintenanceId
-          ? prev.maintenance.map((item) => sameId(item.id, editingMaintenanceId) ? computed : item)
-          : [...prev.maintenance, computed],
-      }));
     }
+
+    upsertStoredMaintenanceDetail(computed);
+    commitDataUpdate((prev) => ({
+      ...prev,
+      maintenance: editingMaintenanceId
+        ? prev.maintenance.map((item) => (sameId(item.id, editingMaintenanceId) ? computed : item))
+        : [...prev.maintenance, computed],
+    }));
     closeMaintenanceModal();
   }
 
@@ -1367,14 +1423,16 @@ export default function App() {
   }
 
   async function deleteMaintenanceOrder(id) {
-    removeStoredMaintenanceDetail(id);
     if (onlineMode && isSupabaseConfigured) {
       const { error } = await supabase.from("maintenance_orders").delete().eq("id", id);
       if (error) return setErrorMessage(error.message);
-      await fetchAllData();
-    } else {
-      setData((prev) => ({ ...prev, maintenance: prev.maintenance.filter((item) => item.id !== id) }));
     }
+
+    removeStoredMaintenanceDetail(id);
+    commitDataUpdate((prev) => ({
+      ...prev,
+      maintenance: prev.maintenance.filter((item) => item.id !== id),
+    }));
   }
 
   async function closeDay() {
@@ -1413,7 +1471,9 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-        setData({ ...parsed.data, maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles), maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)) });
+        const restoredData = { ...parsed.data, maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles), maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)) };
+        setData(restoredData);
+        saveStoredAppData(restoredData);
         if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
       } catch (error) {
         setErrorMessage("Não foi possível ler o backup. Verifique se é um JSON exportado pelo sistema.");
@@ -1425,7 +1485,8 @@ export default function App() {
   function resetData() {
     saveStoredMaintenanceRoles(initialData.maintenanceRoles);
     saveStoredMaintenanceDetails({});
-    setData(initialData);
+    saveStoredAppData({ ...initialData, maintenanceRoles: initialData.maintenanceRoles });
+    setData({ ...initialData, maintenanceRoles: initialData.maintenanceRoles });
     setCurrentPage("dashboard");
     setSearch("");
     setObraId(initialData.obras[0]?.id || "");
