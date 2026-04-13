@@ -179,16 +179,26 @@ function calculateLaborLine(line) {
   };
 }
 
+
 function calculateMaintenanceItem(item) {
   const compositionType = item?.compositionType === "outsourced" ? "outsourced" : "own";
-  const labor = compositionType === "own"
-    ? (item?.labor || []).map(calculateLaborLine).filter((line) => line.roleId || line.roleName || line.hours || line.daily)
-    : [];
+
+  const labor =
+    compositionType === "own"
+      ? (item?.labor || [])
+          .map(calculateLaborLine)
+          .filter((line) => line.roleId || line.roleName || line.hours || line.daily)
+      : [];
+
   const laborTotal = labor.reduce((acc, line) => acc + Number(line.subtotal || 0), 0);
   const materialCost = compositionType === "own" ? Number(item?.materialCost || 0) : 0;
   const outsourcedServiceCost = compositionType === "outsourced" ? Number(item?.outsourcedServiceCost || 0) : 0;
   const bdi = Number(item?.bdi || 0);
-  const subtotal = compositionType === "outsourced" ? outsourcedServiceCost : laborTotal + materialCost;
+
+  const subtotal =
+    compositionType === "outsourced"
+      ? outsourcedServiceCost
+      : laborTotal + materialCost;
 
   const calculated = subtotal * (1 + bdi / 100);
   const minimumApplied = calculated < 100;
@@ -208,6 +218,7 @@ function calculateMaintenanceItem(item) {
     minimumApplied,
   };
 }
+
 
 function readJsonStorage(key, fallback) {
   if (typeof window === "undefined") return fallback;
