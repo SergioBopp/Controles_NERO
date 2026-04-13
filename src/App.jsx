@@ -189,7 +189,11 @@ function calculateMaintenanceItem(item) {
   const outsourcedServiceCost = compositionType === "outsourced" ? Number(item?.outsourcedServiceCost || 0) : 0;
   const bdi = Number(item?.bdi || 0);
   const subtotal = compositionType === "outsourced" ? outsourcedServiceCost : laborTotal + materialCost;
-  const totalCost = subtotal * (1 + bdi / 100);
+
+  const calculated = subtotal * (1 + bdi / 100);
+  const minimumApplied = calculated < 100;
+  const totalCost = minimumApplied ? 100 : calculated;
+
   return {
     ...item,
     compositionType,
@@ -201,6 +205,7 @@ function calculateMaintenanceItem(item) {
     subtotal,
     totalCost,
     cost: totalCost,
+    minimumApplied,
   };
 }
 
