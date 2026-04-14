@@ -901,34 +901,34 @@ function AttendancePage({ attendance, companies, roles, onBack, onAddPresence, o
   );
 }
 
-function buildPdfHeader(doc, title, obraNome, date, generatedAt) {
+async function buildPdfHeader(doc, title, obraNome, date, generatedAt) {
   const marginLeft = 30;
   const marginRight = 20;
   const marginTop = 20;
   const pageWidth = 210;
   let y = marginTop;
 
-  return loadImageDataUrl(LOGO_SRC)
-    .then((imageDataUrl) => {
-      const logoWidth = 26;
-      const logoHeight = 26;
-      const textStartX = marginLeft + logoWidth + 10;
-      doc.addImage(imageDataUrl, "PNG", marginLeft, y, logoWidth, logoHeight);
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text(title, textStartX, y + 5);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Obra: ${obraNome || "Não informada"}`, textStartX, y + 12);
-      doc.setFontSize(10);
-      doc.text(`Data do fechamento: ${formatDateBR(date)}`, textStartX, y + 18);
-      doc.text(`Gerado em: ${generatedAt}`, textStartX, y + 24);
-      y += 32;
-      doc.line(marginLeft, y, pageWidth - marginRight, y);
-      y += 6;
-      return { y, marginLeft, marginRight };
-    })
-    .catch(() => ({ y: 26, marginLeft, marginRight }));
+  const logoWidth = 26;
+  const logoHeight = 26;
+  const textStartX = marginLeft + logoWidth + 10;
+
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", marginLeft, y, logoWidth, logoHeight);
+  } catch {}
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, textStartX, y + 5);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Obra: ${obraNome || "Não informada"}`, textStartX, y + 12);
+  doc.setFontSize(10);
+  doc.text(`Data do fechamento: ${formatDateBR(date)}`, textStartX, y + 18);
+  doc.text(`Gerado em: ${generatedAt}`, textStartX, y + 24);
+  y += 32;
+  doc.line(marginLeft, y, pageWidth - marginRight, y);
+  y += 6;
+  return { y, marginLeft, marginRight };
 }
 
 function addPageNumbers(doc) {
@@ -1071,17 +1071,21 @@ async function exportMaintenanceLandscapePdf(items, obraAtual) {
   const generatedAt = getDateTimeBRNoSeconds();
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+  } catch {}
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("RELATÓRIO DE MANUTENÇÕES - NERO CONSTRUÇÕES", 14, 16);
+  doc.text("RELATÓRIO DE MANUTENÇÕES - NERO CONSTRUÇÕES", 46, 18);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   const totalValue = (items || []).reduce((acc, item) => acc + Number(item.totalCost || item.cost || 0), 0);
 
-  doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 14, 24);
+  doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
   doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
-  doc.text(`Valor total do momento: ${formatCurrencyBR(totalValue)}`, 14, 30);
-  doc.line(14, 34, pageWidth - 14, 34);
+  doc.text(`Valor total do momento: ${formatCurrencyBR(totalValue)}`, 46, 32);
+  doc.line(14, 38, pageWidth - 14, 38);
 
   const sorted = [...(items || [])].sort((a, b) => {
     const getOs = (value) => {
@@ -1103,7 +1107,7 @@ async function exportMaintenanceLandscapePdf(items, obraAtual) {
   ]);
 
   autoTable(doc, {
-    startY: 40,
+    startY: 44,
     margin: { left: 14, right: 14 },
     head: [["OS", "SERVIÇO", "SOLICITANTE", "DATA DA SOLICIT.", "DATA DA ENTREGA", "VALOR", "RESPONS.", "ATRASO"]],
     body: body.length ? body : [["-", "Sem manutenções", "-", "-", "-", "-", "-", "-"]],
@@ -1240,13 +1244,31 @@ export default function App() {
   }, [attendanceBatchQuantities]);
 
   const filteredMaintenance = useMemo(() => {
-    if (!search.trim()) return filteredData.maintenance;
-    return filteredData.maintenance.filter((item) =>
-      [item.os, item.service, item.requester, item.responsible, (item.labor || []).map((line) => line.roleName).join(" "), getMaintenanceStatus(item), getDelayIndicator(item)]
+    const rawQuery = search.trim();
+    if (!rawQuery) return filteredData.maintenance;
+
+    const normalizedQuery = rawQuery.toLowerCase();
+    const osMatch = normalizedQuery.match(/(?:^|\b)os\s*(\d+)$|^(\d+)$/i);
+    const targetOs = osMatch ? String(osMatch[1] || osMatch[2] || "").trim() : "";
+
+    return filteredData.maintenance.filter((item) => {
+      const itemOs = String(item.os || "").trim();
+
+      if (targetOs) {
+        return itemOs === targetOs;
+      }
+
+      return [
+        item.service,
+        item.requester,
+        item.responsible,
+        (item.labor || []).map((line) => line.roleName).join(" "),
+        getMaintenanceStatus(item),
+      ]
         .join(" ")
         .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+        .includes(normalizedQuery);
+    });
   }, [filteredData.maintenance, search]);
 
   async function fetchAllData() {
