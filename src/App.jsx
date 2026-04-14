@@ -60,6 +60,945 @@ const pages = {
   history: { label: "Histórico", icon: Calendar },
 };
 
+const STOCK_CODE_CATALOG = [
+  {
+    "code": "MC-001",
+    "description": "Argamassa 12kg Argalit",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-002",
+    "description": "Argamassa 20kg Argalit",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-003",
+    "description": "Argamassa AC3",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-004",
+    "description": "Argamassa C3",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-005",
+    "description": "Cimento poty cpII 50kg",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-006",
+    "description": "Massa acrílica 20kg Argalit",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-007",
+    "description": "Massa Corrida PVA 23kg",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-008",
+    "description": "Massa de Reajunte Drywall 25kg",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-009",
+    "description": "Massa Maxcryl 25kg",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-010",
+    "description": "Fundo Preparador de Paredes 18L",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "MC-011",
+    "description": "Texturalit 23kg",
+    "category": "Materiais de Construção",
+    "prefix": "MC"
+  },
+  {
+    "code": "TI-001",
+    "description": "Aditivo Acrílico HEM-1135 20L",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-002",
+    "description": "Aditivo Acrílico HEM-1144 20L",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-003",
+    "description": "Thinner 300ml",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-004",
+    "description": "Tinta Coral Verde Artesão",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-005",
+    "description": "Tinta Coral Bege Cevada",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-006",
+    "description": "Tinta Coral Floresta Negra",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "TI-007",
+    "description": "Suvinil Rende & Cobre 18L Branco",
+    "category": "🎨 Tintas e Complementos",
+    "prefix": "TI"
+  },
+  {
+    "code": "LM-001",
+    "description": "Bacia acoplada Span Round",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-002",
+    "description": "Vaso Acoplado Vertis Total Clean",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-003",
+    "description": "Lavatório Flox Branco",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-004",
+    "description": "Coluna Suspensa Flox/Primula/Lirio",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-005",
+    "description": "Cuba Apoio 410x310 Branco",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-006",
+    "description": "Cuba Semi Encaixe 40cm",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-007",
+    "description": "Torneira Bica Baixa Automática",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-008",
+    "description": "Torneira Cozinha Flex Plus",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-009",
+    "description": "Torneira Lavatório Automática Celite",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-010",
+    "description": "Torneira Lavatório Spot",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-011",
+    "description": "Torneira Jardim",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-012",
+    "description": "Sifão Lavatório",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-013",
+    "description": "Sifão Extensivo",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-014",
+    "description": "Válvula Escapamento",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-015",
+    "description": "Válvula DN32",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-016",
+    "description": "Registro gaveta",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "LM-017",
+    "description": "Acabamento Registro",
+    "category": "🚿 Louças e Metais",
+    "prefix": "LM"
+  },
+  {
+    "code": "HI-001",
+    "description": "Base registro DN20",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-002",
+    "description": "Ligação flexível inox",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-003",
+    "description": "Mangueira de incêndio",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-004",
+    "description": "Tubo de 32 água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-005",
+    "description": "Tubo de 40 água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-006",
+    "description": "T de 40 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-007",
+    "description": "T de 32 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-008",
+    "description": "T 32 / 25 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-009",
+    "description": "Curva 32 água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-010",
+    "description": "Redução de 32/25 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-011",
+    "description": "Joelho de 32 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-012",
+    "description": "luva de 40 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-013",
+    "description": "Luva de 32 Água fria",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-014",
+    "description": "tubo de 75 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-015",
+    "description": "Joelho de 75 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-016",
+    "description": "Redução 50/40 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-017",
+    "description": "Luva de 50 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-018",
+    "description": "Junção de 40 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-019",
+    "description": "Junção de 50 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-020",
+    "description": "Luva de 75 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-021",
+    "description": "T de 50 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-022",
+    "description": "Luva de 100 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-023",
+    "description": "Joelho de 100 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "HI-024",
+    "description": "Curva de 100 esgoto",
+    "category": "🔧 Hidráulica",
+    "prefix": "HI"
+  },
+  {
+    "code": "FX-001",
+    "description": "Bucha nº6",
+    "category": "🧰 Fixação",
+    "prefix": "FX"
+  },
+  {
+    "code": "FX-002",
+    "description": "Parafuso 3,5x25",
+    "category": "🧰 Fixação",
+    "prefix": "FX"
+  },
+  {
+    "code": "FX-003",
+    "description": "Parafuso 4,0x45",
+    "category": "🧰 Fixação",
+    "prefix": "FX"
+  },
+  {
+    "code": "FX-004",
+    "description": "Parafuso 4,5x40",
+    "category": "🧰 Fixação",
+    "prefix": "FX"
+  },
+  {
+    "code": "FX-005",
+    "description": "Parafuso GN25",
+    "category": "🧰 Fixação",
+    "prefix": "FX"
+  },
+  {
+    "code": "DR-001",
+    "description": "Placa Drywall acústica",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-002",
+    "description": "Lã termo acústica",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-003",
+    "description": "HEM-VÉU",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-004",
+    "description": "Fita papel metálica",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-005",
+    "description": "Fita microperfurada",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-006",
+    "description": "Fita alumínio",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-007",
+    "description": "Fita fibra de vidro",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-008",
+    "description": "Tabica branca",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-009",
+    "description": "Lona elevador",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-010",
+    "description": "Alçapão Clicado com Tampa 40x40cm",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "DR-011",
+    "description": "Montante 70x0,5 x3000 mm",
+    "category": "🪵 Drywall e Isolamento",
+    "prefix": "DR"
+  },
+  {
+    "code": "AD-001",
+    "description": "Galverette A",
+    "category": "🧴 Adesivos e Selantes",
+    "prefix": "AD"
+  },
+  {
+    "code": "AD-002",
+    "description": "Galverette B",
+    "category": "🧴 Adesivos e Selantes",
+    "prefix": "AD"
+  },
+  {
+    "code": "AD-003",
+    "description": "Muzafan 39",
+    "category": "🧴 Adesivos e Selantes",
+    "prefix": "AD"
+  },
+  {
+    "code": "AD-004",
+    "description": "Espuma expansiva MP90",
+    "category": "🧴 Adesivos e Selantes",
+    "prefix": "AD"
+  },
+  {
+    "code": "AD-005",
+    "description": "Tubos cola acabamento",
+    "category": "🧴 Adesivos e Selantes",
+    "prefix": "AD"
+  },
+  {
+    "code": "PS-001",
+    "description": "Piso vinílico 2,30",
+    "category": "🧱 Pisos e Revestimentos",
+    "prefix": "PS"
+  },
+  {
+    "code": "PS-002",
+    "description": "Piso vinílico 90x90",
+    "category": "🧱 Pisos e Revestimentos",
+    "prefix": "PS"
+  },
+  {
+    "code": "FE-001",
+    "description": "Rolo de tinta 23cm",
+    "category": "🛠️ Ferramentas",
+    "prefix": "FE"
+  },
+  {
+    "code": "FE-002",
+    "description": "Suporte rolo 23cm",
+    "category": "🛠️ Ferramentas",
+    "prefix": "FE"
+  },
+  {
+    "code": "EP-001",
+    "description": "Bota nº 40",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-002",
+    "description": "Capacete amarelo",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-003",
+    "description": "Capa de chuva",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-004",
+    "description": "Luva",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-005",
+    "description": "Luva látex GG",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-006",
+    "description": "Máscara",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-007",
+    "description": "Óculos de proteção",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "EP-008",
+    "description": "Protetor auricular",
+    "category": "🦺 EPIs",
+    "prefix": "EP"
+  },
+  {
+    "code": "UN-001",
+    "description": "Calça P",
+    "category": "👕 Uniformes",
+    "prefix": "UN"
+  },
+  {
+    "code": "UN-002",
+    "description": "Calça G",
+    "category": "👕 Uniformes",
+    "prefix": "UN"
+  },
+  {
+    "code": "UN-003",
+    "description": "Calça GG",
+    "category": "👕 Uniformes",
+    "prefix": "UN"
+  },
+  {
+    "code": "UN-004",
+    "description": "Camisa G",
+    "category": "👕 Uniformes",
+    "prefix": "UN"
+  },
+  {
+    "code": "UN-005",
+    "description": "Camisa GG",
+    "category": "👕 Uniformes",
+    "prefix": "UN"
+  },
+  {
+    "code": "AC-001",
+    "description": "Barra apoio 70cm",
+    "category": "♿ Acessibilidade",
+    "prefix": "AC"
+  },
+  {
+    "code": "AC-002",
+    "description": "Barra apoio 80cm",
+    "category": "♿ Acessibilidade",
+    "prefix": "AC"
+  },
+  {
+    "code": "FER-001",
+    "description": "Trinchão",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-002",
+    "description": "Trinchão (cabo quebrado) Tigre",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-003",
+    "description": "Rolo Industrial Atlas",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-004",
+    "description": "Espuma Multiuso Atlas",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-005",
+    "description": "Lixa 180 Tigre",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-006",
+    "description": "Lixa 220 Tigre",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-007",
+    "description": "Lixa 180 Norton",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-008",
+    "description": "Lixa 180 Vonder",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-009",
+    "description": "Lixa 180 3M",
+    "category": "Ferramentas e Pintura",
+    "prefix": "FER"
+  },
+  {
+    "code": "REV-001",
+    "description": "Espaçador Nivelador Slim 2,0 mm",
+    "category": "🧱 Revestimento e Nivelamento",
+    "prefix": "REV"
+  },
+  {
+    "code": "REV-002",
+    "description": "Cunha Nivelador Cortag",
+    "category": "🧱 Revestimento e Nivelamento",
+    "prefix": "REV"
+  },
+  {
+    "code": "REV-003",
+    "description": "Espaçador Nivelador Slim 3,0 mm",
+    "category": "🧱 Revestimento e Nivelamento",
+    "prefix": "REV"
+  },
+  {
+    "code": "REV-004",
+    "description": "Espaçador Nivelador Estreito 2 mm",
+    "category": "🧱 Revestimento e Nivelamento",
+    "prefix": "REV"
+  },
+  {
+    "code": "REV-005",
+    "description": "Reajunte CZ Platina",
+    "category": "🧱 Revestimento e Nivelamento",
+    "prefix": "REV"
+  },
+  {
+    "code": "ADE-001",
+    "description": "Adesivo Plástico Amanco",
+    "category": "🧴 Adesivos e Vedação",
+    "prefix": "ADE"
+  },
+  {
+    "code": "ADE-002",
+    "description": "Adesivo para pisos vinílicos Quartzolit",
+    "category": "🧴 Adesivos e Vedação",
+    "prefix": "ADE"
+  },
+  {
+    "code": "ADE-003",
+    "description": "Fita Teflon Noah",
+    "category": "🧴 Adesivos e Vedação",
+    "prefix": "ADE"
+  },
+  {
+    "code": "ADE-004",
+    "description": "Fita Dupla Face",
+    "category": "🧴 Adesivos e Vedação",
+    "prefix": "ADE"
+  },
+  {
+    "code": "ELE-001",
+    "description": "Lâmpada LED Tubular T8 BYD",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-002",
+    "description": "Lâmpada LED Taschibra",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-003",
+    "description": "Luminária LED 24W",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-004",
+    "description": "Painel Embutir Quadrado Avant",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-005",
+    "description": "Painel Embutir Redondo",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-006",
+    "description": "Spot LED 5W",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-007",
+    "description": "Sensor de Presença",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-008",
+    "description": "Condulete Wetzel",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-009",
+    "description": "Condulete XPW-20 1T",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-010",
+    "description": "Condulete XPW-20 3T",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-011",
+    "description": "Tomada 2P+T",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-012",
+    "description": "Tomada 20A Sob Condulete",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-013",
+    "description": "Caixa Drywall 4x2",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-014",
+    "description": "Caixa de Passagem",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-015",
+    "description": "Placa 4x2 1 posto",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-016",
+    "description": "Placa 4x4 1+1",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-017",
+    "description": "Placa 4x2 2 postos",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-018",
+    "description": "Placa 4x2 3 postos",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-019",
+    "description": "Placa cega 4x2",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-020",
+    "description": "Placa cega 4x4",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-021",
+    "description": "Suporte 4x2",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-022",
+    "description": "Suporte 4x4",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-023",
+    "description": "Cabo 1,5 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-024",
+    "description": "Cabo 2,5 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-025",
+    "description": "Cabo 4,0 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-026",
+    "description": "Cabo 6,0 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-027",
+    "description": "Cabo 10 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-028",
+    "description": "Cabo 16 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-029",
+    "description": "Cabo 25 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-030",
+    "description": "Cabo 35 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-031",
+    "description": "Cabo 50 mm²",
+    "category": "⚡ Elétrica",
+    "prefix": "ELE"
+  },
+  {
+    "code": "GER-001",
+    "description": "Saco para entulho",
+    "category": "🧰 Materiais Gerais",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-002",
+    "description": "Tábuas",
+    "category": "🧰 Materiais Gerais",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-003",
+    "description": "Tanque Plástico Astra",
+    "category": "🧰 Materiais Gerais",
+    "prefix": "GER"
+  },
+  {
+    "code": "PRE-001",
+    "description": "Embaia Prepara Pro Quartzolit",
+    "category": "🧪 Preparação de Superfície",
+    "prefix": "PRE"
+  },
+  {
+    "code": "FIT-001",
+    "description": "Fita Crepe",
+    "category": "🎯 Fitas",
+    "prefix": "FIT"
+  },
+  {
+    "code": "FIT-002",
+    "description": "Fita Isolante 3M",
+    "category": "🎯 Fitas",
+    "prefix": "FIT"
+  },
+  {
+    "code": "FIT-003",
+    "description": "Fita Zebrada",
+    "category": "🎯 Fitas",
+    "prefix": "FIT"
+  },
+  {
+    "code": "AL-001",
+    "description": "Bloco",
+    "category": "🧱 Alvenaria",
+    "prefix": "AL"
+  }
+];
+
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -73,6 +1012,30 @@ function formatDateBR(isoDate) {
 
 function formatCurrencyBR(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+}
+
+
+function getStockCatalogEntry(query) {
+  const normalized = String(query || "").trim().toLowerCase();
+  if (!normalized) return null;
+  return STOCK_CODE_CATALOG.find((entry) => {
+    const optionLabel = `${entry.code} - ${entry.description}`.toLowerCase();
+    return entry.code.toLowerCase() === normalized || optionLabel === normalized;
+  }) || null;
+}
+
+function buildStockItemLabel(code, description) {
+  const cleanedCode = String(code || "").trim();
+  const cleanedDescription = String(description || "").trim();
+  if (!cleanedCode) return cleanedDescription;
+  return `${cleanedCode} - ${cleanedDescription}`;
+}
+
+function parseStockItemLabel(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([A-Z]{2,}-\d+)\s*-\s*(.+)$/i);
+  if (!match) return { code: "", description: raw };
+  return { code: match[1].toUpperCase(), description: match[2].trim() };
 }
 
 function getTodayBR() {
@@ -692,15 +1655,20 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
 function StockPage({ stock, onBack, onAdd, onDelete }) {
   return (
     <div className="space-y-6">
-      <Card><CardHeader title="Almoxarifado" description="Materiais, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {stock.map((item) => (
+        {stock.map((item) => {
+          const parsed = parseStockItemLabel(item.item);
+          return (
           <Card key={item.id}>
             <div className="p-5 space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm text-slate-500">{item.category}</p>
-                  <h3 className="text-base font-semibold text-slate-900 mt-1">{item.item}</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-slate-500">{item.category}</p>
+                    {parsed.code ? <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200">{parsed.code}</Badge> : null}
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-900 mt-1">{parsed.description || item.item}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Estoque mínimo" : "Normal"}</Badge>
@@ -715,7 +1683,7 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
               </div>
             </div>
           </Card>
-        ))}
+        )})}
       </div>
     </div>
   );
@@ -1351,7 +2319,7 @@ export default function App() {
   const [roleForm, setRoleForm] = useState({ companyId: "", name: "" });
   const [maintenanceRoleForm, setMaintenanceRoleForm] = useState({ name: "", daily: 0 });
   const [obraForm, setObraForm] = useState({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
-  const [stockForm, setStockForm] = useState({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
+  const [stockForm, setStockForm] = useState({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
   const [selectedMaintenanceDetails, setSelectedMaintenanceDetails] = useState(null);
@@ -1387,6 +2355,11 @@ export default function App() {
   const attendanceBatchTotal = useMemo(() => {
     return Object.values(attendanceBatchQuantities).reduce((acc, value) => acc + Number(value || 0), 0);
   }, [attendanceBatchQuantities]);
+
+  const stockCatalogOptions = useMemo(() => {
+    return STOCK_CODE_CATALOG.map((entry) => `${entry.code} - ${entry.description}`);
+  }, []);
+
 
   const filteredMaintenance = useMemo(() => {
     const rawQuery = search.trim();
@@ -1775,16 +2748,43 @@ export default function App() {
   }
 
   async function addStockItem() {
-    const payload = { id: generateId(), obraId, item: stockForm.item, unit: stockForm.unit, quantity: Number(stockForm.quantity), min: Number(stockForm.min), category: stockForm.category, invoice: stockForm.invoice, price: Number(stockForm.price) };
+    const entry = getStockCatalogEntry(stockForm.code);
+    const finalCode = entry?.code || String(stockForm.code || "").trim().toUpperCase();
+    const finalDescription = String(stockForm.item || "").trim() || entry?.description || "";
+    const finalCategory = String(stockForm.category || "").trim() || entry?.category || "Material";
+
+    const payload = {
+      id: generateId(),
+      obraId,
+      item: buildStockItemLabel(finalCode, finalDescription),
+      unit: stockForm.unit,
+      quantity: Number(stockForm.quantity),
+      min: Number(stockForm.min),
+      category: finalCategory,
+      invoice: stockForm.invoice,
+      price: Number(stockForm.price),
+    };
+
+    if (!finalDescription) return setErrorMessage("Informe ou selecione um material.");
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("stock_items").insert({ id: payload.id, obra_id: payload.obraId, item: payload.item, unit: payload.unit, quantity: payload.quantity, min_quantity: payload.min, category: payload.category, invoice: payload.invoice, price: payload.price });
+      const { error } = await supabase.from("stock_items").insert({
+        id: payload.id,
+        obra_id: payload.obraId,
+        item: payload.item,
+        unit: payload.unit,
+        quantity: payload.quantity,
+        min_quantity: payload.min,
+        category: payload.category,
+        invoice: payload.invoice,
+        price: payload.price
+      });
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
     } else {
       setData((prev) => ({ ...prev, stock: [...prev.stock, payload] }));
     }
     setStockModal(false);
-    setStockForm({ item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
+    setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
   }
 
   function closeMaintenanceModal() {
@@ -2194,6 +3194,28 @@ export default function App() {
 
       <Modal open={stockModal} title="Novo material" onClose={() => setStockModal(false)}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Código do catálogo">
+            <div className="space-y-2">
+              <Input
+                list="stock-code-catalog"
+                placeholder="Digite ou selecione um código"
+                value={stockForm.code}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const entry = getStockCatalogEntry(raw);
+                  setStockForm((prev) => ({
+                    ...prev,
+                    code: entry ? entry.code : raw.toUpperCase(),
+                    item: entry ? entry.description : prev.item,
+                    category: entry ? entry.category : prev.category,
+                  }));
+                }}
+              />
+              <datalist id="stock-code-catalog">
+                {stockCatalogOptions.map((option) => <option key={option} value={option} />)}
+              </datalist>
+            </div>
+          </Field>
           <Field label="Material"><Input value={stockForm.item} onChange={(e) => setStockForm((prev) => ({ ...prev, item: e.target.value }))} /></Field>
           <Field label="Categoria"><Input value={stockForm.category} onChange={(e) => setStockForm((prev) => ({ ...prev, category: e.target.value }))} /></Field>
           <Field label="Unidade"><Input value={stockForm.unit} onChange={(e) => setStockForm((prev) => ({ ...prev, unit: e.target.value }))} /></Field>
@@ -2201,6 +3223,9 @@ export default function App() {
           <Field label="Mínimo"><Input type="number" value={stockForm.min} onChange={(e) => setStockForm((prev) => ({ ...prev, min: e.target.value }))} /></Field>
           <Field label="NF"><Input value={stockForm.invoice} onChange={(e) => setStockForm((prev) => ({ ...prev, invoice: e.target.value }))} /></Field>
           <Field label="Valor unitário"><Input type="number" step="0.01" value={stockForm.price} onChange={(e) => setStockForm((prev) => ({ ...prev, price: e.target.value }))} /></Field>
+        </div>
+        <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
+          Use o catálogo de códigos da planilha para padronizar os materiais. O sistema salva o item como <strong>código + descrição</strong>.
         </div>
         <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setStockModal(false)}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
       </Modal>
