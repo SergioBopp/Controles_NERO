@@ -48,6 +48,7 @@ const initialData = {
   ],
   maintenance: [],
   stock: [],
+  stockMovements: [],
   attendance: [],
   history: [],
 };
@@ -1652,7 +1653,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, onBack, onAdd, onDelete }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove }) {
   return (
     <div className="space-y-6">
       <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
@@ -1670,8 +1671,10 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
                   </div>
                   <h3 className="text-base font-semibold text-slate-900 mt-1">{parsed.description || item.item}</h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Estoque mínimo" : "Normal"}</Badge>
+                  <Button variant="outline" className="h-9 px-3 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onMove(item, "entrada")}><Plus className="h-4 w-4" /> Entrada</Button>
+                  <Button variant="outline" className="h-9 px-3 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => onMove(item, "saida")}><ArrowLeft className="h-4 w-4" /> Saída</Button>
                   <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
                 </div>
               </div>
@@ -1680,6 +1683,23 @@ function StockPage({ stock, onBack, onAdd, onDelete }) {
                 <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Mínimo</p><p className="text-xl font-bold text-slate-900 mt-1">{item.min} {item.unit}</p></div>
                 <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Nota fiscal</p><p className="font-medium text-slate-900 mt-1">{item.invoice || "-"}</p></div>
                 <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Valor unitário</p><p className="font-medium text-slate-900 mt-1">{formatCurrencyBR(item.price)}</p></div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                <p className="text-sm font-semibold text-slate-800">Últimas movimentações</p>
+                <div className="mt-2 space-y-2">
+                  {(stockMovements || []).filter((mv) => sameId(mv.itemId, item.id)).slice(0, 4).map((mv) => (
+                    <div key={mv.id} className="flex items-center justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800">{mv.type === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
+                        <p className="text-slate-500 truncate">{mv.responsible || "-"} {mv.note ? `• ${mv.note}` : ""}</p>
+                      </div>
+                      <Badge className={mv.type === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
+                        {mv.type === "entrada" ? "+" : "-"} {mv.quantity}
+                      </Badge>
+                    </div>
+                  ))}
+                  {!(stockMovements || []).some((mv) => sameId(mv.itemId, item.id)) ? <p className="text-sm text-slate-500">Sem movimentações registradas.</p> : null}
+                </div>
               </div>
             </div>
           </Card>
@@ -2320,6 +2340,8 @@ export default function App() {
   const [maintenanceRoleForm, setMaintenanceRoleForm] = useState({ name: "", daily: 0 });
   const [obraForm, setObraForm] = useState({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   const [stockForm, setStockForm] = useState({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
+  const [stockMovementModal, setStockMovementModal] = useState(false);
+  const [stockMovementForm, setStockMovementForm] = useState({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
   const [selectedMaintenanceDetails, setSelectedMaintenanceDetails] = useState(null);
@@ -2359,6 +2381,18 @@ export default function App() {
   const stockCatalogOptions = useMemo(() => {
     return STOCK_CODE_CATALOG.map((entry) => `${entry.code} - ${entry.description}`);
   }, []);
+
+  function openStockMovementModal(item, type = "entrada") {
+    setStockMovementForm({
+      itemId: item?.id || "",
+      type,
+      quantity: 0,
+      note: "",
+      responsible: "",
+      date: getTodayISO(),
+    });
+    setStockMovementModal(true);
+  }
 
 
   const filteredMaintenance = useMemo(() => {
@@ -2406,18 +2440,19 @@ export default function App() {
     setLoading(true);
     setErrorMessage("");
     try {
-      const [obrasRes, companiesRes, rolesRes, maintenanceRolesRes, stockRes, maintenanceRes, attendanceRes, historyRes] = await Promise.all([
+      const [obrasRes, companiesRes, rolesRes, maintenanceRolesRes, stockRes, stockMovementsRes, maintenanceRes, attendanceRes, historyRes] = await Promise.all([
         supabase.from("obras").select("*").order("id", { ascending: true }),
         supabase.from("companies").select("*").order("id", { ascending: true }),
         supabase.from("roles").select("*").order("id", { ascending: true }),
         supabase.from("maintenance_roles").select("*").order("name", { ascending: true }),
         supabase.from("stock_items").select("*").order("id", { ascending: true }),
+        supabase.from("stock_movements").select("*").order("movement_date", { ascending: false }),
         supabase.from("maintenance_orders").select("*").order("id", { ascending: true }),
         supabase.from("attendance_records").select("*").order("id", { ascending: true }),
         supabase.from("history_snapshots").select("*").order("date", { ascending: false }),
       ]);
 
-      const errors = [obrasRes.error, companiesRes.error, rolesRes.error, maintenanceRolesRes.error, stockRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
+      const errors = [obrasRes.error, companiesRes.error, rolesRes.error, maintenanceRolesRes.error, stockRes.error, stockMovementsRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
       if (errors.length) throw errors[0];
 
       const nextData = {
@@ -2426,6 +2461,7 @@ export default function App() {
         roles: (rolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, name: row.name })),
         maintenanceRoles: (maintenanceRolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, daily: Number(row.daily || 0) })),
         stock: (stockRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
+        stockMovements: (stockMovementsRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, itemId: row.item_id, type: row.type, quantity: row.quantity, note: row.note, responsible: row.responsible, date: row.movement_date })),
         maintenance: (maintenanceRes.data || []).map((row) => calculateMaintenanceItem({
           id: row.id,
           obraId: row.obra_id,
@@ -2745,6 +2781,71 @@ export default function App() {
     setAttendanceModal(false);
     setAttendanceBatchCompanyId("");
     setAttendanceBatchQuantities({});
+  }
+
+  async function saveStockMovement() {
+    const qty = Number(stockMovementForm.quantity || 0);
+    if (!stockMovementForm.itemId || qty <= 0) {
+      setErrorMessage("Informe item e quantidade da movimentação.");
+      return;
+    }
+
+    const currentItem = (data.stock || []).find((item) => sameId(item.id, stockMovementForm.itemId));
+    if (!currentItem) {
+      setErrorMessage("Material não encontrado.");
+      return;
+    }
+
+    const currentQty = Number(currentItem.quantity || 0);
+    const nextQty = stockMovementForm.type === "entrada" ? currentQty + qty : currentQty - qty;
+
+    if (stockMovementForm.type === "saida" && nextQty < 0) {
+      setErrorMessage("Saída maior que o saldo disponível.");
+      return;
+    }
+
+    const movement = {
+      id: generateUuid(),
+      obraId,
+      itemId: currentItem.id,
+      type: stockMovementForm.type,
+      quantity: qty,
+      note: stockMovementForm.note,
+      responsible: stockMovementForm.responsible,
+      date: stockMovementForm.date || getTodayISO(),
+    };
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error: stockError } = await supabase
+        .from("stock_items")
+        .update({ quantity: nextQty })
+        .eq("id", currentItem.id);
+
+      if (stockError) return setErrorMessage(stockError.message);
+
+      const { error: movementError } = await supabase.from("stock_movements").insert({
+        id: movement.id,
+        obra_id: movement.obraId,
+        item_id: movement.itemId,
+        type: movement.type,
+        quantity: movement.quantity,
+        note: movement.note,
+        responsible: movement.responsible,
+        movement_date: movement.date,
+      });
+
+      if (movementError) return setErrorMessage(movementError.message);
+      await fetchAllData();
+    } else {
+      commitDataUpdate((prev) => ({
+        ...prev,
+        stock: prev.stock.map((item) => sameId(item.id, currentItem.id) ? { ...item, quantity: nextQty } : item),
+        stockMovements: [movement, ...(prev.stockMovements || [])],
+      }));
+    }
+
+    setStockMovementModal(false);
+    setStockMovementForm({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
   }
 
   async function addStockItem() {
@@ -3068,7 +3169,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} onMove={openStockMovementModal} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
