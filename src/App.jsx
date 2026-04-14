@@ -789,7 +789,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
 
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>Detalhes</Button>
-                    <Button variant="outline" className="h-10 px-4" onClick={() => onExportOSPdf(item)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
+                    <Button variant="outline" className="h-10 px-4" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportOSPdf(item)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
                     <Button variant="outline" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}>Editar</Button>
                     <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>Excluir</Button>
                   </div>
@@ -984,23 +984,23 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 50, 16);
+  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 46, 16);
 
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text(`Obra: ${obraAtual?.nome || "-"}`, 14, 26);
-  doc.text(`Gerado em: ${generatedAt}`, 14, 32);
-  doc.text(`OS: ${item?.os || "-"}`, 14, 40);
-  doc.text(`Serviço: ${item?.service || "-"}`, 14, 46);
-  doc.text(`Solicitante: ${item?.requester || "-"}`, 14, 52);
-  doc.text(`Data da solicitação: ${formatDateBR(item?.requestDate)}`, 14, 58);
-  doc.text(`Data da entrega: ${formatDateBR(item?.deliveryDate)}`, 14, 64);
-  doc.text(`Responsável: ${item?.responsible || "-"}`, 14, 70);
+  doc.text(`Obra: ${obraAtual?.nome || "-"}`, 46, 26);
+  doc.text(`Gerado em: ${generatedAt}`, 46, 32);
+  doc.text(`OS: ${item?.os || "-"}`, 14, 46);
+  doc.text(`Serviço: ${item?.service || "-"}`, 14, 54);
+  doc.text(`Solicitante: ${item?.requester || "-"}`, 14, 62);
+  doc.text(`Data da solicitação: ${formatDateBR(item?.requestDate)}`, 14, 70);
+  doc.text(`Data da entrega: ${formatDateBR(item?.deliveryDate)}`, 14, 78);
+  doc.text(`Responsável: ${item?.responsible || "-"}`, 14, 86);
 
-  doc.line(14, 76, 196, 76);
+  doc.line(14, 92, 196, 92);
 
-  let y = 84;
+  let y = 100;
 
   if (item?.compositionType === "outsourced") {
     doc.setFont("helvetica", "bold");
@@ -2136,7 +2136,7 @@ export default function App() {
             )}
 
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => exportMaintenanceOSPdf(selectedMaintenanceDetails, obraAtual)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => exportMaintenanceOSPdf(selectedMaintenanceDetails, obraAtual)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
               <Button variant="outline" onClick={() => setSelectedMaintenanceDetails(null)}>Fechar</Button>
               <Button onClick={() => { const target = selectedMaintenanceDetails; setSelectedMaintenanceDetails(null); openMaintenanceEditor(target); }}>Editar manutenção</Button>
             </div>
