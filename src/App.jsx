@@ -979,12 +979,12 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
 
   
   try {
-    doc.addImage(LOGO_BASE64, "PNG", 14, 11, 34, 8.5);
+    doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
   } catch {}
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 54, 16);
+  doc.text("ORDEM DE SERVIÇO - MANUTENÇÃO", 50, 16);
 
 
   doc.setFont("helvetica", "normal");
