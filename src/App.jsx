@@ -789,6 +789,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
 
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>Detalhes</Button>
+                    <Button variant="outline" className="h-10 px-4" onClick={() => onExportOSPdf(item)}><FileText className="h-4 w-4" /> PDF da OS</Button>
                     <Button variant="outline" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}>Editar</Button>
                     <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>Excluir</Button>
                   </div>
@@ -2135,6 +2136,7 @@ export default function App() {
             )}
 
             <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => exportMaintenanceOSPdf(selectedMaintenanceDetails, obraAtual)}><FileText className="h-4 w-4" /> PDF da OS</Button>
               <Button variant="outline" onClick={() => setSelectedMaintenanceDetails(null)}>Fechar</Button>
               <Button onClick={() => { const target = selectedMaintenanceDetails; setSelectedMaintenanceDetails(null); openMaintenanceEditor(target); }}>Editar manutenção</Button>
             </div>
