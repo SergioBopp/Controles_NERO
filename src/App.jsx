@@ -84,6 +84,26 @@ function getTodayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function hasSameCalendarDay(value, isoDate) {
+  if (!value || !isoDate) return false;
+  return String(value).slice(0, 10) === String(isoDate).slice(0, 10);
+}
+
+function prepareNextDayData(appData, todayIso) {
+  const history = Array.isArray(appData?.history) ? appData.history : [];
+  const alreadyClosedToday = history.some((entry) => hasSameCalendarDay(entry?.date, todayIso));
+  if (alreadyClosedToday) return appData;
+
+  const currentAttendance = Array.isArray(appData?.attendance) ? appData.attendance : [];
+  const hasOpenAttendance = currentAttendance.some((row) => Number(row?.qty || 0) > 0);
+  if (!hasOpenAttendance) return appData;
+
+  return {
+    ...appData,
+    attendance: currentAttendance.map((row) => ({ ...row, qty: 0 })),
+  };
+}
+
 function getDateTimeBRNoSeconds() {
   const now = new Date();
   const date = now.toLocaleDateString("pt-BR");
@@ -147,14 +167,14 @@ function getStoredAppData() {
 
 function normalizeStoredAppData(stored) {
   if (!stored || typeof stored !== "object") return null;
-  return {
+  return prepareNextDayData({
     ...initialData,
     ...stored,
     maintenanceRoles: Array.isArray(stored.maintenanceRoles) && stored.maintenanceRoles.length
       ? stored.maintenanceRoles
       : getStoredMaintenanceRoles(initialData.maintenanceRoles),
     maintenance: (stored.maintenance || []).map((item) => calculateMaintenanceItem(item)),
-  };
+  }, getTodayISO());
 }
 
 function saveStoredAppData(appData) {
@@ -1977,11 +1997,11 @@ export default function App() {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!parsed?.data) throw new Error("Arquivo inválido.");
-        const restoredData = {
+        const restoredData = prepareNextDayData({
           ...parsed.data,
           maintenanceRoles: parsed.data.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles),
           maintenance: (parsed.data.maintenance || []).map((item) => calculateMaintenanceItem(item)),
-        };
+        }, getTodayISO());
 
         setData(persistAppSnapshot(restoredData));
         if (parsed.data.obras?.[0]) setObraId(parsed.data.obras[0].id);
