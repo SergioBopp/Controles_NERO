@@ -579,10 +579,18 @@ function HomeStatCard({ title, value, subtitle, icon: Icon, alert, tone = "defau
 
 function QuickActionCard({ icon: Icon, title, subtitle, onClick }) {
   return (
-    <button onClick={onClick} className="text-left rounded-[20px] border border-slate-200 p-4 transition-all duration-300 bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 hover:bg-slate-50">
+    <button
+      onClick={onClick}
+      className="group text-left rounded-[22px] border border-emerald-200 bg-white p-4 transition-all duration-300 shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] hover:border-emerald-300"
+    >
       <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-slate-100 text-slate-700"><Icon className="h-5 w-5" /></div>
-        <div className="min-w-0"><p className="font-semibold text-slate-900">{title}</p><p className="text-sm text-slate-500 mt-1">{subtitle}</p></div>
+        <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-emerald-50 text-emerald-700 transition-colors group-hover:bg-emerald-100">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900">{title}</p>
+          <p className="text-sm text-slate-500 mt-1 leading-snug">{subtitle}</p>
+        </div>
       </div>
     </button>
   );
