@@ -1000,6 +1000,24 @@ const STOCK_CODE_CATALOG = [
   }
 ];
 
+
+const STOCK_UNIT_OPTIONS = [
+  "un",
+  "m",
+  "m²",
+  "m³",
+  "kg",
+  "g",
+  "l",
+  "ml",
+  "cx",
+  "rolo",
+  "barra",
+  "saco",
+  "pç",
+  "par",
+];
+
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -1653,10 +1671,10 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit }) {
   return (
     <div className="space-y-6">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {stock.map((item) => {
           const parsed = parseStockItemLabel(item.item);
@@ -1673,6 +1691,8 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove }) {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Estoque mínimo" : "Normal"}</Badge>
+                  <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onView(item)}><Search className="h-4 w-4" /> Consultar</Button>
+                  <Button variant="outline" className="h-9 px-3 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}><FileText className="h-4 w-4" /> Editar</Button>
                   <Button variant="outline" className="h-9 px-3 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onMove(item, "entrada")}><Plus className="h-4 w-4" /> Entrada</Button>
                   <Button variant="outline" className="h-9 px-3 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => onMove(item, "saida")}><ArrowLeft className="h-4 w-4" /> Saída</Button>
                   <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
@@ -2342,6 +2362,12 @@ export default function App() {
   const [stockForm, setStockForm] = useState({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
   const [stockMovementModal, setStockMovementModal] = useState(false);
   const [stockMovementForm, setStockMovementForm] = useState({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
+  const [stockViewModal, setStockViewModal] = useState(false);
+  const [selectedStockItem, setSelectedStockItem] = useState(null);
+  const [stockEditModal, setStockEditModal] = useState(false);
+  const [editingStockId, setEditingStockId] = useState("");
+  const [stockPickerModal, setStockPickerModal] = useState({ open: false, mode: "view" });
+  const [stockPickerItemId, setStockPickerItemId] = useState("");
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
   const [selectedMaintenanceDetails, setSelectedMaintenanceDetails] = useState(null);
@@ -2382,6 +2408,13 @@ export default function App() {
     return STOCK_CODE_CATALOG.map((entry) => `${entry.code} - ${entry.description}`);
   }, []);
 
+  const stockUnitOptions = useMemo(() => STOCK_UNIT_OPTIONS, []);
+
+  function openStockPickerModal(mode = "view") {
+    setStockPickerItemId("");
+    setStockPickerModal({ open: true, mode });
+  }
+
   function openStockMovementModal(item, type = "entrada") {
     setStockMovementForm({
       itemId: item?.id || "",
@@ -2392,6 +2425,27 @@ export default function App() {
       date: getTodayISO(),
     });
     setStockMovementModal(true);
+  }
+
+  function openStockViewModal(item) {
+    setSelectedStockItem(item || null);
+    setStockViewModal(true);
+  }
+
+  function openStockEditModal(item) {
+    const parsed = parseStockItemLabel(item?.item);
+    setEditingStockId(item?.id || "");
+    setStockForm({
+      code: parsed.code || "",
+      item: parsed.description || item?.item || "",
+      unit: item?.unit || "un",
+      quantity: Number(item?.quantity || 0),
+      min: Number(item?.min || 0),
+      category: item?.category || "Material",
+      invoice: item?.invoice || "",
+      price: Number(item?.price || 0),
+    });
+    setStockEditModal(true);
   }
 
 
@@ -2855,7 +2909,7 @@ export default function App() {
     const finalCategory = String(stockForm.category || "").trim() || entry?.category || "Material";
 
     const payload = {
-      id: generateId(),
+      id: editingStockId || generateId(),
       obraId,
       item: buildStockItemLabel(finalCode, finalDescription),
       unit: stockForm.unit,
@@ -2868,23 +2922,45 @@ export default function App() {
 
     if (!finalDescription) return setErrorMessage("Informe ou selecione um material.");
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("stock_items").insert({
-        id: payload.id,
-        obra_id: payload.obraId,
-        item: payload.item,
-        unit: payload.unit,
-        quantity: payload.quantity,
-        min_quantity: payload.min,
-        category: payload.category,
-        invoice: payload.invoice,
-        price: payload.price
-      });
-      if (error) return setErrorMessage(error.message);
+      if (editingStockId) {
+        const { error } = await supabase.from("stock_items").update({
+          item: payload.item,
+          unit: payload.unit,
+          quantity: payload.quantity,
+          min_quantity: payload.min,
+          category: payload.category,
+          invoice: payload.invoice,
+          price: payload.price
+        }).eq("id", editingStockId);
+        if (error) return setErrorMessage(error.message);
+      } else {
+        const { error } = await supabase.from("stock_items").insert({
+          id: payload.id,
+          obra_id: payload.obraId,
+          item: payload.item,
+          unit: payload.unit,
+          quantity: payload.quantity,
+          min_quantity: payload.min,
+          category: payload.category,
+          invoice: payload.invoice,
+          price: payload.price
+        });
+        if (error) return setErrorMessage(error.message);
+      }
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, stock: [...prev.stock, payload] }));
+      if (editingStockId) {
+        commitDataUpdate((prev) => ({
+          ...prev,
+          stock: prev.stock.map((item) => sameId(item.id, editingStockId) ? payload : item),
+        }));
+      } else {
+        setData((prev) => ({ ...prev, stock: [...prev.stock, payload] }));
+      }
     }
     setStockModal(false);
+    setStockEditModal(false);
+    setEditingStockId("");
     setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
   }
 
@@ -3169,7 +3245,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => setStockModal(true)} onDelete={deleteStockItem} onMove={openStockMovementModal} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
@@ -3293,7 +3369,7 @@ export default function App() {
         </div>
       </Modal>
 
-      <Modal open={stockModal} title="Novo material" onClose={() => setStockModal(false)}>
+      <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Código do catálogo">
             <div className="space-y-2">
@@ -3319,7 +3395,7 @@ export default function App() {
           </Field>
           <Field label="Material"><Input value={stockForm.item} onChange={(e) => setStockForm((prev) => ({ ...prev, item: e.target.value }))} /></Field>
           <Field label="Categoria"><Input value={stockForm.category} onChange={(e) => setStockForm((prev) => ({ ...prev, category: e.target.value }))} /></Field>
-          <Field label="Unidade"><Input value={stockForm.unit} onChange={(e) => setStockForm((prev) => ({ ...prev, unit: e.target.value }))} /></Field>
+          <Field label="Unidade"><select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={stockForm.unit} onChange={(e) => setStockForm((prev) => ({ ...prev, unit: e.target.value }))}>{stockUnitOptions.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></Field>
           <Field label="Saldo"><Input type="number" value={stockForm.quantity} onChange={(e) => setStockForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
           <Field label="Mínimo"><Input type="number" value={stockForm.min} onChange={(e) => setStockForm((prev) => ({ ...prev, min: e.target.value }))} /></Field>
           <Field label="NF"><Input value={stockForm.invoice} onChange={(e) => setStockForm((prev) => ({ ...prev, invoice: e.target.value }))} /></Field>
@@ -3328,10 +3404,122 @@ export default function App() {
         <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
           Use o catálogo de códigos da planilha para padronizar os materiais. O sistema salva o item como <strong>código + descrição</strong>.
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setStockModal(false)}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); }}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
       </Modal>
 
 
+
+      <Modal open={stockPickerModal.open} title={stockPickerModal.mode === "edit" ? "Selecionar material para editar" : "Selecionar material para consulta"} onClose={() => setStockPickerModal({ open: false, mode: "view" })}>
+        <div className="space-y-4">
+          <Field label="Material">
+            <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={stockPickerItemId} onChange={(e) => setStockPickerItemId(e.target.value)}>
+              <option value="">Selecione um material</option>
+              {(data.stock || []).map((item) => {
+                const parsed = parseStockItemLabel(item.item);
+                return <option key={item.id} value={item.id}>{parsed.code ? `${parsed.code} - ` : ""}{parsed.description || item.item}</option>;
+              })}
+            </select>
+          </Field>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+            Use este atalho para abrir rapidamente a consulta ou a edição do material, sem precisar localizar o card na lista.
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setStockPickerModal({ open: false, mode: "view" })}>Cancelar</Button>
+            <Button
+              disabled={!stockPickerItemId}
+              onClick={() => {
+                const target = (data.stock || []).find((item) => sameId(item.id, stockPickerItemId));
+                setStockPickerModal({ open: false, mode: "view" });
+                if (!target) return;
+                if (stockPickerModal.mode === "edit") {
+                  openStockEditModal(target);
+                } else {
+                  openStockViewModal(target);
+                }
+              }}
+            >
+              Abrir
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={stockViewModal} title="Consulta de estoque" onClose={() => setStockViewModal(false)}>
+        {selectedStockItem ? (() => {
+          const parsed = parseStockItemLabel(selectedStockItem.item);
+          const itemMovements = (data.stockMovements || []).filter((mv) => sameId(mv.itemId, selectedStockItem.id));
+          return (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Código</p>
+                  <p className="mt-1 font-semibold text-slate-900">{parsed.code || "-"}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Categoria</p>
+                  <p className="mt-1 font-semibold text-slate-900">{selectedStockItem.category || "-"}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 md:col-span-2">
+                  <p className="text-sm text-slate-500">Descrição</p>
+                  <p className="mt-1 font-semibold text-slate-900">{parsed.description || selectedStockItem.item}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Saldo atual</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">{selectedStockItem.quantity} {selectedStockItem.unit}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Estoque mínimo</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">{selectedStockItem.min} {selectedStockItem.unit}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Nota fiscal</p>
+                  <p className="mt-1 font-semibold text-slate-900">{selectedStockItem.invoice || "-"}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-sm text-slate-500">Valor unitário</p>
+                  <p className="mt-1 font-semibold text-slate-900">{formatCurrencyBR(selectedStockItem.price)}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <p className="text-sm font-semibold text-slate-800">Histórico do item</p>
+                <div className="mt-3 space-y-3">
+                  {itemMovements.length ? itemMovements.map((mv) => (
+                    <div key={mv.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{mv.type === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
+                        <p className="text-sm text-slate-500">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
+                      </div>
+                      <Badge className={mv.type === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
+                        {mv.type === "entrada" ? "+" : "-"} {mv.quantity}
+                      </Badge>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">Sem movimentações registradas para este item.</p>}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setStockViewModal(false)}>Fechar</Button>
+                <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={() => { setStockViewModal(false); openStockEditModal(selectedStockItem); }}>Editar material</Button>
+              </div>
+            </div>
+          );
+        })() : null}
+      </Modal>
+
+      <Modal open={stockMovementModal} title={stockMovementForm.type === "entrada" ? "Entrada de material" : "Saída de material"} onClose={() => setStockMovementModal(false)}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Quantidade"><Input type="number" min="0" step="0.01" value={stockMovementForm.quantity} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
+          <Field label="Data"><Input type="date" value={stockMovementForm.date} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, date: e.target.value }))} /></Field>
+          <Field label="Responsável"><Input value={stockMovementForm.responsible} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, responsible: e.target.value }))} /></Field>
+          <Field label="Destino / Observação"><Input value={stockMovementForm.note} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, note: e.target.value }))} /></Field>
+        </div>
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+          Registre entradas e saídas para manter o saldo automático e o histórico do item.
+        </div>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setStockMovementModal(false)}>Cancelar</Button>
+          <Button onClick={saveStockMovement}>Salvar movimentação</Button>
+        </div>
+      </Modal>
       <Modal open={!!selectedMaintenanceDetails} title={`Detalhes da manutenção${selectedMaintenanceDetails?.os ? ` - OS ${selectedMaintenanceDetails.os}` : ""}`} onClose={() => setSelectedMaintenanceDetails(null)}>
         {selectedMaintenanceDetails ? (
           <div className="space-y-6">
