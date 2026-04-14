@@ -1671,10 +1671,10 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements }) {
   return (
     <div className="space-y-6">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {stock.map((item) => {
           const parsed = parseStockItemLabel(item.item);
@@ -1975,6 +1975,91 @@ function addPageNumbers(doc) {
     doc.setFontSize(9);
     doc.text(String(i), doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: "center" });
   }
+}
+
+
+async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const generatedAt = getDateTimeBRNoSeconds();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const movimentos = [...(stockMovements || [])].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+  } catch {}
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RELATÓRIO DE MOVIMENTAÇÕES - ALMOXARIFADO", 46, 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
+  doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
+  doc.line(14, 38, pageWidth - 14, 38);
+
+  const body = movimentos.map((mv) => {
+    const item = (stockItems || []).find((row) => sameId(row.id, mv.itemId));
+    const parsed = parseStockItemLabel(item?.item || "");
+    return [
+      formatDateBR(mv.date),
+      mv.type === "entrada" ? "Entrada" : "Saída",
+      parsed.code || "-",
+      parsed.description || item?.item || "-",
+      mv.responsible || "-",
+      mv.note || "-",
+      `${mv.type === "entrada" ? "+" : "-"} ${mv.quantity}`,
+      item ? `${item.quantity} ${item.unit}` : "-",
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 44,
+    margin: { left: 14, right: 14 },
+    tableWidth: "auto",
+    head: [["DATA", "TIPO", "CÓDIGO", "MATERIAL", "RESPONSÁVEL", "DESTINO / OBS.", "MOV.", "SALDO"]],
+    body: body.length ? body : [["-", "-", "-", "Sem movimentações", "-", "-", "-", "-"]],
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [16, 185, 129],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 24, halign: "center" },
+      1: { cellWidth: 20, halign: "center" },
+      2: { cellWidth: 26, halign: "center" },
+      3: { cellWidth: 85 },
+      4: { cellWidth: 36 },
+      5: { cellWidth: 52 },
+      6: { cellWidth: 20, halign: "center" },
+      7: { cellWidth: 22, halign: "center" },
+    },
+    didDrawPage: function () {
+      const pw = doc.internal.pageSize.getWidth();
+      try {
+        doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+      } catch {}
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("RELATÓRIO DE MOVIMENTAÇÕES - ALMOXARIFADO", 46, 18);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
+      doc.text(`Gerado em: ${generatedAt}`, pw - 14, 24, { align: "right" });
+      doc.line(14, 38, pw - 14, 38);
+    },
+  });
+
+  addPageNumbers(doc);
+  doc.save(`relatorio-movimentacoes-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
 }
 
 async function exportDailyPdf(day, companies, roles, obraNome) {
@@ -3245,7 +3330,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
