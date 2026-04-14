@@ -950,34 +950,144 @@ function addPageNumbers(doc) {
 }
 
 async function exportDailyPdf(day, companies, roles, obraNome) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const generatedAt = getDateTimeBRNoSeconds();
-  const { y, marginLeft, marginRight } = await buildPdfHeader(doc, "RELATÓRIO DIÁRIO - NERO CONSTRUÇÕES", obraNome, day.date, generatedAt);
+  const { y, marginLeft, marginRight } = await buildPdfHeader(
+    doc,
+    "RELATÓRIO DIÁRIO - NERO CONSTRUÇÕES",
+    obraNome,
+    day.date,
+    generatedAt
+  );
+
   const attendanceRows = companies.flatMap((company) =>
     roles
       .filter((role) => role.companyId === company.id)
       .map((role) => {
-        const qty = (day.attendance || []).filter((a) => a.companyId === company.id && a.roleId === role.id).reduce((acc, row) => acc + Number(row.qty || 0), 0);
+        const qty = (day.attendance || [])
+          .filter((a) => a.companyId === company.id && a.roleId === role.id)
+          .reduce((acc, row) => acc + Number(row.qty || 0), 0);
         return qty > 0 ? [company.name, role.name, qty] : null;
       })
       .filter(Boolean)
   );
-  const maintenanceRows = (day.maintenance || []).map((m) => [m.os, m.service, getMaintenanceStatus(m), getDelayIndicator(m)]);
-  const stockRows = (day.stock || []).map((s) => [s.item, s.quantity, s.min, formatCurrencyBR(s.price)]);
 
-  autoTable(doc, { startY: y, margin: { left: marginLeft, right: marginRight }, styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5 }, head: [["Indicador", "Valor"]], body: [["Total presente", String((day.attendance || []).reduce((acc, row) => acc + Number(row.qty || 0), 0))], ["Materiais cadastrados", String((day.stock || []).length)], ["Ordens de manutenção", String((day.maintenance || []).length)]], theme: "grid" });
+  const maintenanceRows = (day.maintenance || []).map((m) => [
+    m.os,
+    m.service,
+    getMaintenanceStatus(m),
+    getDelayIndicator(m),
+  ]);
+
+  const stockRows = (day.stock || []).map((s) => [
+    s.item,
+    s.quantity,
+    s.min,
+    formatCurrencyBR(s.price),
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: marginLeft, right: marginRight },
+    styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5 },
+    head: [["Indicador", "Valor"]],
+    body: [
+      ["Total presente", String((day.attendance || []).reduce((acc, row) => acc + Number(row.qty || 0), 0))],
+      ["Materiais cadastrados", String((day.stock || []).length)],
+      ["Ordens de manutenção", String((day.maintenance || []).length)],
+    ],
+    theme: "grid",
+  });
 
   let nextY = doc.lastAutoTable.finalY + 6;
-  autoTable(doc, { startY: nextY, margin: { left: marginLeft, right: marginRight }, styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5 }, head: [["Empresa", "Função", "Quantidade"]], body: attendanceRows.length ? attendanceRows : [["Sem registros", "-", "-"]], theme: "grid" });
-  nextY = doc.lastAutoTable.finalY + 6;
-  autoTable(doc, { startY: nextY, margin: { left: marginLeft, right: marginRight }, styles: { fontSize: 9, font: "helvetica", cellPadding: 1.5 }, head: [["OS", "Serviço", "Status", "Atraso"]], body: maintenanceRows.length ? maintenanceRows : [["Sem manutenções", "-", "-", "-"]], theme: "grid" });
-  nextY = doc.lastAutoTable.finalY + 6;
-  autoTable(doc, { startY: nextY, margin: { left: marginLeft, right: marginRight }, styles: { fontSize: 9, font: "helvetica", cellPadding: 1.5 }, head: [["Material", "Saldo", "Mínimo", "Valor"]], body: stockRows.length ? stockRows : [["Sem materiais", "-", "-", "-"]], theme: "grid" });
+  autoTable(doc, {
+    startY: nextY,
+    margin: { left: marginLeft, right: marginRight },
+    styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5 },
+    head: [["Empresa", "Função", "Quantidade"]],
+    body: attendanceRows.length ? attendanceRows : [["Sem registros", "-", "-"]],
+    theme: "grid",
+  });
+
+  doc.addPage("a4", "landscape");
+  const landscapeWidth = doc.internal.pageSize.getWidth();
+
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+  } catch {}
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RELATÓRIO DIÁRIO - NERO CONSTRUÇÕES", 46, 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(`Obra: ${obraNome || "Não informada"}`, 46, 26);
+  doc.text(`Data do fechamento: ${formatDateBR(day.date)}`, 46, 32);
+  doc.text(`Gerado em: ${generatedAt}`, landscapeWidth - 14, 24, { align: "right" });
+  doc.text("Seção: Manutenções", 46, 38);
+  doc.line(14, 42, landscapeWidth - 14, 42);
+
+  autoTable(doc, {
+    startY: 48,
+    margin: { left: 14, right: 14 },
+    tableWidth: "auto",
+    styles: { fontSize: 8, font: "helvetica", cellPadding: 1.5 },
+    head: [["OS", "Serviço", "Status", "Atraso"]],
+    body: maintenanceRows.length ? maintenanceRows : [["Sem manutenções", "-", "-", "-"]],
+    theme: "grid",
+    headStyles: {
+      fillColor: [16, 185, 129],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 16, halign: "center" },
+      1: { cellWidth: 170 },
+      2: { cellWidth: 28, halign: "center" },
+      3: { cellWidth: 18, halign: "center" },
+    },
+    didDrawPage: function () {
+      const pw = doc.internal.pageSize.getWidth();
+      try {
+        doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+      } catch {}
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("RELATÓRIO DIÁRIO - NERO CONSTRUÇÕES", 46, 18);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.text(`Obra: ${obraNome || "Não informada"}`, 46, 26);
+      doc.text(`Data do fechamento: ${formatDateBR(day.date)}`, 46, 32);
+      doc.text(`Gerado em: ${generatedAt}`, pw - 14, 24, { align: "right" });
+      doc.text("Seção: Manutenções", 46, 38);
+      doc.line(14, 42, pw - 14, 42);
+    },
+  });
+
+  doc.addPage("a4", "portrait");
+  const { y: stockY, marginLeft: stockLeft, marginRight: stockRight } = await buildPdfHeader(
+    doc,
+    "RELATÓRIO DIÁRIO - NERO CONSTRUÇÕES",
+    obraNome,
+    day.date,
+    generatedAt
+  );
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text("Seção: Almoxarifado", stockLeft, stockY - 2);
+
+  autoTable(doc, {
+    startY: stockY + 4,
+    margin: { left: stockLeft, right: stockRight },
+    styles: { fontSize: 9, font: "helvetica", cellPadding: 1.5 },
+    head: [["Material", "Saldo", "Mínimo", "Valor"]],
+    body: stockRows.length ? stockRows : [["Sem materiais", "-", "-", "-"]],
+    theme: "grid",
+  });
 
   addPageNumbers(doc);
   doc.save(`relatorio-geral-${day.date}.pdf`);
 }
-
 
 
 async function exportMaintenanceOSPdf(item, obraAtual) {
@@ -1173,7 +1283,7 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
                 <div className="text-sm text-slate-500">{day.maintenance?.length || 0} manutenções • {day.stock?.length || 0} itens • {day.attendance?.length || 0} registros</div>
                 <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" onClick={() => setSelected(day)}>Ver detalhes</Button>
-                  <Button onClick={() => exportDailyPdf(day, companies, roles, day.obraName)}><FileText className="h-4 w-4" /> PDF Geral</Button>
+                  <Button onClick={() => exportDailyPdf(day, companies, roles, day.obraName)}><FileText className="h-4 w-4" /> RELATÓRIO GERAL</Button>
                 </div>
               </div>
             </Card>
