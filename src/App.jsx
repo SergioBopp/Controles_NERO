@@ -503,9 +503,9 @@ function Topbar({
                 onChange={(value) => setObraId(value)}
                 options={obras.length ? obras.map((obra) => ({ value: String(obra.id), label: obra.nome })) : [{ value: "", label: "Sem obras cadastradas" }]}
               />
-              <Button variant="outline" onClick={onOpenObras}><Building2 className="h-4 w-4" /> Obras</Button>
-              <Button variant="outline" onClick={onExportBackup}><Download className="h-4 w-4" /> Exportar backup</Button>
-              <Button variant="outline" onClick={onImportBackupClick}><Upload className="h-4 w-4" /> Importar backup</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenObras}><Building2 className="h-4 w-4" /> Obras</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportBackup}><Download className="h-4 w-4" /> Exportar backup</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onImportBackupClick}><Upload className="h-4 w-4" /> Importar backup</Button>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-3 flex-wrap justify-end">
@@ -513,8 +513,8 @@ function Topbar({
             <Badge className="bg-white text-slate-700 border-slate-300 text-sm px-4 h-10 rounded-full"><Calendar className="h-4 w-4 mr-2" /> {getTodayBR()}</Badge>
             {currentPage === "dashboard" ? (
               <>
-                <Button variant="outline" className="rounded-xl px-4 h-10" onClick={onCloseDay}>Fechar dia</Button>
-                <Button variant="outline" className="rounded-xl px-4 h-10" onClick={onReset}>Resetar base</Button>
+                <Button variant="outline" className="rounded-xl px-4 h-10 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onCloseDay}>Fechar dia</Button>
+                <Button variant="outline" className="rounded-xl px-4 h-10 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onReset}>Resetar base</Button>
               </>
             ) : null}
           </div>
@@ -664,7 +664,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
 function StockPage({ stock, onBack, onAdd, onDelete }) {
   return (
     <div className="space-y-6">
-      <Card><CardHeader title="Almoxarifado" description="Materiais, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais, nota fiscal, valor e estoque mínimo" right={<div className="flex gap-3"><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {stock.map((item) => (
           <Card key={item.id}>
@@ -726,9 +726,9 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <Button variant="outline" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
-              <Button variant="outline" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
-              <Button onClick={onAdd}>Nova manutenção</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
+              <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
               <ReturnHomeButton onClick={onBack} />
             </div>
           }
@@ -997,10 +997,11 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
   doc.text(`Data da solicitação: ${formatDateBR(item?.requestDate)}`, 14, 70);
   doc.text(`Data da entrega: ${formatDateBR(item?.deliveryDate)}`, 14, 78);
   doc.text(`Responsável: ${item?.responsible || "-"}`, 14, 86);
+  doc.text(`BDI aplicado: ${Number(item?.bdi || 0).toFixed(2).replace(".", ",")}%`, 14, 94);
 
-  doc.line(14, 92, 196, 92);
+  doc.line(14, 100, 196, 100);
 
-  let y = 100;
+  let y = 108;
 
   if (item?.compositionType === "outsourced") {
     doc.setFont("helvetica", "bold");
