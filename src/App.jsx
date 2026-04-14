@@ -1077,7 +1077,11 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
 
 
 async function exportMaintenanceLandscapePdf(items, obraAtual) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
   const generatedAt = getDateTimeBRNoSeconds();
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -1119,12 +1123,13 @@ async function exportMaintenanceLandscapePdf(items, obraAtual) {
   autoTable(doc, {
     startY: 44,
     margin: { left: 14, right: 14 },
+    tableWidth: "auto",
     head: [["OS", "SERVIÇO", "SOLICITANTE", "DATA DA SOLICIT.", "DATA DA ENTREGA", "VALOR", "RESPONS.", "ATRASO"]],
     body: body.length ? body : [["-", "Sem manutenções", "-", "-", "-", "-", "-", "-"]],
     theme: "grid",
     styles: {
       font: "helvetica",
-      fontSize: 9,
+      fontSize: 8,
       cellPadding: 2,
       overflow: "linebreak",
       valign: "middle",
@@ -1137,13 +1142,13 @@ async function exportMaintenanceLandscapePdf(items, obraAtual) {
     },
     columnStyles: {
       0: { cellWidth: 14, halign: "center" },
-      1: { cellWidth: 86 },
-      2: { cellWidth: 34 },
-      3: { cellWidth: 26, halign: "center" },
-      4: { cellWidth: 26, halign: "center" },
-      5: { cellWidth: 28, halign: "right" },
-      6: { cellWidth: 30 },
-      7: { cellWidth: 18, halign: "center" },
+      1: { cellWidth: 112 },
+      2: { cellWidth: 36 },
+      3: { cellWidth: 28, halign: "center" },
+      4: { cellWidth: 28, halign: "center" },
+      5: { cellWidth: 30, halign: "right" },
+      6: { cellWidth: 34 },
+      7: { cellWidth: 20, halign: "center" },
     },
   });
 
