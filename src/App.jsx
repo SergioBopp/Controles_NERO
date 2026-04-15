@@ -2431,6 +2431,7 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const [attendanceModal, setAttendanceModal] = useState(false);
+  const [attendanceEditRecord, setAttendanceEditRecord] = useState(null);
   const [stockModal, setStockModal] = useState(false);
   const [maintenanceModal, setMaintenanceModal] = useState(false);
   const [maintenanceRoleModal, setMaintenanceRoleModal] = useState(false);
@@ -2488,6 +2489,25 @@ export default function App() {
   const attendanceBatchTotal = useMemo(() => {
     return Object.values(attendanceBatchQuantities).reduce((acc, value) => acc + Number(value || 0), 0);
   }, [attendanceBatchQuantities]);
+
+  function getAttendanceQuantitiesForCompany(companyId) {
+    const numericCompanyId = Number(companyId);
+    if (!numericCompanyId) return {};
+    return filteredData.attendance
+      .filter((item) => Number(item.companyId) === numericCompanyId)
+      .reduce((acc, item) => {
+        acc[item.roleId] = Number(item.qty || 0);
+        return acc;
+      }, {});
+  }
+
+  function openAttendanceEdit(record) {
+    if (!record) return;
+    setAttendanceEditRecord(record);
+    setAttendanceBatchCompanyId(String(record.companyId));
+    setAttendanceBatchQuantities({ [record.roleId]: Number(record.qty || 0) });
+    setAttendanceModal(true);
+  }
 
   const stockCatalogOptions = useMemo(() => {
     return STOCK_CODE_CATALOG.map((entry) => `${entry.code} - ${entry.description}`);
@@ -2816,6 +2836,15 @@ export default function App() {
     } else {
       setData((prev) => ({ ...prev, roles: [...prev.roles, payload] }));
     }
+
+    if (String(attendanceBatchCompanyId) === String(payload.companyId)) {
+      setAttendanceBatchQuantities((prev) => ({
+        ...getAttendanceQuantitiesForCompany(payload.companyId),
+        ...prev,
+        [payload.id]: 0,
+      }));
+    }
+
     setRoleModal(false);
     setRoleForm({ companyId: "", name: "" });
   }
@@ -2892,32 +2921,78 @@ export default function App() {
   async function addAttendanceRecord() {
     const companyId = Number(attendanceBatchCompanyId);
     const validRoles = filteredData.roles.filter((role) => role.companyId === companyId);
-    const payloads = validRoles.map((role) => ({
-      id: generateId(),
-      obraId,
-      companyId,
-      roleId: role.id,
-      qty: Number(attendanceBatchQuantities[role.id] || 0),
-    })).filter((item) => item.qty > 0);
 
     if (!companyId) return;
 
+    const existingCompanyAttendance = filteredData.attendance.filter((item) => Number(item.companyId) === companyId);
+    const existingByRoleId = new Map(existingCompanyAttendance.map((item) => [Number(item.roleId), item]));
+    const touchedRoleIds = new Set(Object.keys(attendanceBatchQuantities).map((key) => Number(key)));
+
+    const upserts = [];
+    const deletes = [];
+
+    validRoles.forEach((role) => {
+      if (!touchedRoleIds.has(Number(role.id))) return;
+
+      const qty = Number(attendanceBatchQuantities[role.id] || 0);
+      const existing = existingByRoleId.get(Number(role.id));
+
+      if (qty > 0) {
+        upserts.push({
+          id: existing?.id || generateId(),
+          obraId,
+          companyId,
+          roleId: role.id,
+          qty,
+        });
+      } else if (existing) {
+        deletes.push(existing.id);
+      }
+    });
+
     if (onlineMode && isSupabaseConfigured) {
-      const roleIds = validRoles.map((role) => role.id);
-      if (roleIds.length) {
-        const { error: deleteError } = await supabase.from("attendance_records").delete().eq("obra_id", obraId).eq("company_id", companyId).in("role_id", roleIds);
+      if (deletes.length) {
+        const { error: deleteError } = await supabase
+          .from("attendance_records")
+          .delete()
+          .in("id", deletes);
         if (deleteError) return setErrorMessage(deleteError.message);
       }
-      if (payloads.length) {
-        const { error } = await supabase.from("attendance_records").insert(payloads.map((item) => ({ id: item.id, obra_id: item.obraId, company_id: item.companyId, role_id: item.roleId, qty: item.qty })));
+
+      if (upserts.length) {
+        const { error } = await supabase.from("attendance_records").upsert(
+          upserts.map((item) => ({
+            id: item.id,
+            obra_id: item.obraId,
+            company_id: item.companyId,
+            role_id: item.roleId,
+            qty: item.qty,
+          }))
+        );
         if (error) return setErrorMessage(error.message);
       }
+
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, attendance: [...prev.attendance.filter((item) => !(sameId(item.obraId, obraId) && item.companyId === companyId)), ...payloads] }));
+      commitDataUpdate((prev) => {
+        const deleteSet = new Set(deletes.map((id) => String(id)));
+        const upsertByRole = new Map(upserts.map((item) => [String(item.roleId), item]));
+        const preserved = prev.attendance.filter((item) => {
+          if (deleteSet.has(String(item.id))) return false;
+          if (sameId(item.obraId, obraId) && Number(item.companyId) === companyId && upsertByRole.has(String(item.roleId))) {
+            return false;
+          }
+          return true;
+        });
+        return {
+          ...prev,
+          attendance: [...preserved, ...upserts],
+        };
+      });
     }
 
     setAttendanceModal(false);
+    setAttendanceEditRecord(null);
     setAttendanceBatchCompanyId("");
     setAttendanceBatchQuantities({});
   }
@@ -3375,7 +3450,11 @@ export default function App() {
       <Modal open={attendanceModal} title="Lançar presença" onClose={() => setAttendanceModal(false)}>
         <div className="space-y-5">
           <Field label="Empresa">
-            <SelectField value={attendanceBatchCompanyId} onChange={(value) => { setAttendanceBatchCompanyId(value); setAttendanceBatchQuantities({}); }} options={[{ value: "", label: "Selecione..." }, ...filteredData.companies.map((c) => ({ value: String(c.id), label: c.name }))]} />
+            <SelectField value={attendanceBatchCompanyId} onChange={(value) => {
+              if (attendanceEditRecord) return;
+              setAttendanceBatchCompanyId(value);
+              setAttendanceBatchQuantities(getAttendanceQuantitiesForCompany(value));
+            }} options={[{ value: "", label: "Selecione..." }, ...filteredData.companies.map((c) => ({ value: String(c.id), label: c.name }))]} disabled={!!attendanceEditRecord} />
           </Field>
           {attendanceBatchCompanyId ? (
             <div className="overflow-hidden rounded-[24px] border border-slate-200">
