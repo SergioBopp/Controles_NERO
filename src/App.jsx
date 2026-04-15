@@ -1437,7 +1437,7 @@ function LogoBlock() {
     <div className="flex items-center gap-4">
       <div className="h-16 w-16 rounded-[20px] overflow-hidden bg-white shadow-sm border border-slate-200 flex items-center justify-center">
         <img
-          src={LOGO_SRC}
+          src={LOGO_BASE64}
           alt="Logo NERO"
           className="h-full w-full object-contain"
           onError={(e) => {
@@ -1654,7 +1654,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
         <HomeStatCard title="Manutenções atrasadas" value={delayedCount} subtitle="Prazo ultrapassado" icon={AlertTriangle} alert={delayedCount > 0} />
         <HomeStatCard title="Itens críticos" value={criticalStock} subtitle="Abaixo do mínimo" icon={Package} alert={criticalStock > 0} />
         <HomeStatCard title="Total presente" value={totalPresent} subtitle="Equipe somada na obra" icon={Users} />
-        <HomeStatCard title="Custo total" value={formatCurrencyBR(totalMaintenanceCost)} subtitle="Total das OS da obra" icon={Briefcase} />
+        <HomeStatCard title="Custo total" value={formatCurrencyBR(totalMaintenanceCost)} subtitle="Filtro atual da manutenção" icon={Briefcase} />
       </section>
 
       <Card className="overflow-hidden shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
@@ -1770,10 +1770,10 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
       <Card>
         <CardHeader
           title="Manutenções"
-          description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso` }
+          description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso`}
           right={
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-              <div className="relative w-full sm:w-80">
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-start sm:items-center">
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-base">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge><div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
@@ -2577,6 +2577,7 @@ export default function App() {
   const [roleModal, setRoleModal] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState("");
   const [obraModal, setObraModal] = useState(false);
+  const [editingObraId, setEditingObraId] = useState("");
 
   const [attendanceBatchCompanyId, setAttendanceBatchCompanyId] = useState("");
   const [attendanceBatchQuantities, setAttendanceBatchQuantities] = useState({});
@@ -3004,15 +3005,38 @@ export default function App() {
   }
 
   async function addObra() {
-    const payload = { id: generateUuid(), ...obraForm };
+    const payload = { id: editingObraId || generateUuid(), ...obraForm };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("obras").insert({ id: payload.id, nome: payload.nome, cliente: payload.cliente, local: payload.local, status: payload.status, data_inicio: payload.dataInicio, observacao: payload.observacao });
-      if (error) return setErrorMessage(error.message);
+      if (editingObraId) {
+        const { error } = await supabase
+          .from("obras")
+          .update({
+            nome: payload.nome,
+            cliente: payload.cliente,
+            local: payload.local,
+            status: payload.status,
+            data_inicio: payload.dataInicio,
+            observacao: payload.observacao
+          })
+          .eq("id", editingObraId);
+        if (error) return setErrorMessage(error.message);
+      } else {
+        const { error } = await supabase.from("obras").insert({ id: payload.id, nome: payload.nome, cliente: payload.cliente, local: payload.local, status: payload.status, data_inicio: payload.dataInicio, observacao: payload.observacao });
+        if (error) return setErrorMessage(error.message);
+      }
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, obras: [...prev.obras, payload] }));
+      if (editingObraId) {
+        commitDataUpdate((prev) => ({
+          ...prev,
+          obras: prev.obras.map((obra) => sameId(obra.id, editingObraId) ? payload : obra),
+        }));
+      } else {
+        setData((prev) => ({ ...prev, obras: [...prev.obras, payload] }));
+      }
     }
     setObraId(payload.id);
+    setEditingObraId("");
     setObraModal(false);
     setObraForm({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   }
@@ -3657,7 +3681,7 @@ export default function App() {
         </div>
       </div>
 
-      <Modal open={obraModal} title="Cadastro de obras" onClose={() => setObraModal(false)}>
+      <Modal open={obraModal} title={editingObraId ? "Editar obra" : "Cadastro de obras"} onClose={() => { setObraModal(false); setEditingObraId(""); }}>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nome da obra"><Input value={obraForm.nome} onChange={(e) => setObraForm((prev) => ({ ...prev, nome: e.target.value }))} /></Field>
@@ -3668,8 +3692,8 @@ export default function App() {
             <Field label="Observação"><Input value={obraForm.observacao} onChange={(e) => setObraForm((prev) => ({ ...prev, observacao: e.target.value }))} /></Field>
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setObraModal(false)}>Fechar</Button>
-            <Button onClick={addObra} disabled={!obraForm.nome}>Salvar obra</Button>
+            <Button variant="outline" onClick={() => { setObraModal(false); setEditingObraId(""); }}>Fechar</Button>
+            <Button onClick={addObra} disabled={!obraForm.nome}>{editingObraId ? "Salvar alteração" : "Salvar obra"}</Button>
           </div>
           <Card>
             <CardHeader title="Obras cadastradas" />
@@ -3680,7 +3704,38 @@ export default function App() {
                     <p className="font-semibold text-slate-900">{obra.nome}</p>
                     <p className="text-sm text-slate-500">{obra.cliente} • {obra.local}</p>
                   </div>
-                  <Badge className="bg-white text-slate-700 border-slate-300">{obra.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-white text-slate-700 border-slate-300">{obra.status}</Badge>
+                    <Button
+                      variant="outline"
+                      className="h-9 px-3 rounded-xl"
+                      onClick={() => {
+                        setObraForm({
+                          nome: obra.nome || "",
+                          cliente: obra.cliente || "",
+                          local: obra.local || "",
+                          status: obra.status || "Ativa",
+                          dataInicio: obra.dataInicio || getTodayISO(),
+                          observacao: obra.observacao || "",
+                        });
+                        setEditingObraId(obra.id);
+                        setObraModal(true);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="danger"
+                      className="h-9 px-3 rounded-xl"
+                      onClick={() => {
+                        if (window.confirm("Tem certeza que deseja excluir esta obra?")) {
+                          deleteObra(obra.id);
+                        }
+                      }}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
