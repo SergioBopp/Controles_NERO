@@ -1962,7 +1962,7 @@ function AttendancePage({
                     <tr>
                       <th className="px-6 py-5 text-left text-[1.05rem] font-extrabold text-slate-900">CARGO/FUNÇÃO</th>
                       <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[180px]">PRESENTE</th>
-                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[620px]">AÇÕES</th>
+                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[520px]">AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1974,7 +1974,7 @@ function AttendancePage({
                           <div className="flex flex-wrap items-center justify-center gap-3">
                             <Button
                               variant="outline"
-                              className="h-11 px-4 border-slate-300 text-slate-700 hover:bg-slate-50"
+                              className="h-10 px-3 border-slate-300 text-slate-700 hover:bg-slate-50"
                               onClick={() => onOpenNewAttendanceForRole({
                                 companyId: row.companyId,
                                 roleId: row.roleId,
@@ -1985,7 +1985,7 @@ function AttendancePage({
                             </Button>
                             <Button
                               variant="outline"
-                              className="h-11 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              className="h-10 px-3 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                               onClick={() => onEditAttendance({
                                 id: row.latestAttendanceId,
                                 companyId: row.companyId,
@@ -1997,7 +1997,7 @@ function AttendancePage({
                             </Button>
                             <Button
                               variant="outline"
-                              className="h-11 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              className="h-10 px-3 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                               onClick={() => onEditRole({
                                 id: row.roleId,
                                 companyId: row.companyId,
@@ -2008,7 +2008,7 @@ function AttendancePage({
                             </Button>
                             <Button
                               variant="outline"
-                              className="h-11 px-4"
+                              className="h-10 px-3"
                               onClick={() => onDeleteRole(row.roleId)}
                             >
                               Excluir função
@@ -2016,7 +2016,7 @@ function AttendancePage({
                             {row.latestAttendanceId ? (
                               <Button
                                 variant="danger"
-                                className="h-11 px-4"
+                                className="h-10 px-3"
                                 onClick={() => onDeletePresence(row.latestAttendanceId)}
                               >
                                 Excluir presença
