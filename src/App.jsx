@@ -1654,7 +1654,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
         <HomeStatCard title="Manutenções atrasadas" value={delayedCount} subtitle="Prazo ultrapassado" icon={AlertTriangle} alert={delayedCount > 0} />
         <HomeStatCard title="Itens críticos" value={criticalStock} subtitle="Abaixo do mínimo" icon={Package} alert={criticalStock > 0} />
         <HomeStatCard title="Total presente" value={totalPresent} subtitle="Equipe somada na obra" icon={Users} />
-        <HomeStatCard title="Custo total" value={formatCurrencyBR(totalMaintenanceCost)} subtitle="Filtro atual da manutenção" icon={Briefcase} />
+        <div aria-hidden="true" className="hidden xl:block" />
       </section>
 
       <Card className="overflow-hidden shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
@@ -1744,7 +1744,129 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, onChooseArea, selectedArea, maintenanceRolesCount }) {
+
+
+
+function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack }) {
+  const groupedAreas = [
+    {
+      title: "Sede principal",
+      subtitle: "Base central de manutenção",
+      items: ["Sede Salvador"],
+      tone: "emerald",
+    },
+    {
+      title: "Regionais",
+      subtitle: "Operação descentralizada",
+      items: MAINTENANCE_AREAS.filter((area) => area !== "Sede Salvador"),
+      tone: "slate",
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <Card className="overflow-hidden border border-emerald-200 shadow-[0_14px_34px_rgba(16,185,129,0.07)]">
+        <div className="relative px-6 py-6 md:px-7 md:py-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 text-white">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,white,transparent_35%),radial-gradient(circle_at_bottom_left,white,transparent_28%)]" />
+          <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+            <div className="max-w-3xl">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80 font-semibold">Mapa operacional</p>
+              <h2 className="text-2xl md:text-3xl font-extrabold mt-2 tracking-tight">Escolher área da manutenção</h2>
+              <p className="text-sm md:text-base text-emerald-50/90 mt-2.5 leading-relaxed">
+                Selecione a sede ou regional para visualizar as OS, gerar relatórios e registrar novas manutenções da área.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge className="bg-white/10 text-white border-white/20 px-4 py-2 rounded-2xl text-sm">
+                {MAINTENANCE_AREAS.length} áreas disponíveis
+              </Badge>
+              <ReturnHomeButton onClick={onBack} />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {groupedAreas.map((group) => (
+        <div key={group.title} className="space-y-3.5">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">{group.title}</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{group.subtitle}</p>
+            </div>
+            <Badge className={group.tone === "emerald" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-slate-100 text-slate-700 border-slate-200"}>
+              {group.items.length} {group.items.length === 1 ? "área" : "áreas"}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+            {group.items.map((area) => {
+              const isSelected = selectedArea === area;
+              const isHeadquarters = area === "Sede Salvador";
+
+              return (
+                <button
+                  key={area}
+                  type="button"
+                  onClick={() => onSelectArea(area)}
+                  className={cn(
+                    "group relative overflow-hidden rounded-[22px] border px-5 py-5 text-left transition-all duration-300 shadow-[0_8px_20px_rgba(15,23,42,0.04)]",
+                    isSelected
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-slate-200 bg-white hover:border-emerald-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.07)]"
+                  )}
+                >
+                  <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_30%)]" />
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={cn(
+                          "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                          isHeadquarters
+                            ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                            : "border-slate-200 bg-slate-100 text-slate-700"
+                        )}>
+                          {isHeadquarters ? "Sede" : "Regional"}
+                        </span>
+                        {isSelected ? (
+                          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-emerald-800">
+                            Selecionada
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 text-[1.35rem] leading-tight font-bold text-slate-900">{area}</div>
+                      <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                        Acesse o painel operacional, acompanhe OS e registre novas manutenções desta área.
+                      </p>
+                    </div>
+
+                    <div className={cn(
+                      "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center border transition-colors",
+                      isHeadquarters
+                        ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                        : "border-slate-200 bg-slate-100 text-slate-700"
+                    )}>
+                      {isHeadquarters ? <Building2 className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
+                    </div>
+                  </div>
+
+                  <div className="relative mt-4 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-600">Ver e criar OS desta área</span>
+                    <span className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 group-hover:border-emerald-200 group-hover:text-emerald-800">
+                      Entrar
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, selectedArea, onResetArea, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
@@ -1773,11 +1895,14 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
           description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso`}
           right={
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-start sm:items-center">
-              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-base">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge><div className="relative w-full sm:w-80">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-base">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge>
+                <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}>Trocar área</Button>
+              </div>
+              <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onChooseArea}><Building2 className="h-4 w-4" /> Escolher área</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
@@ -2570,8 +2695,7 @@ export default function App() {
   const [stockModal, setStockModal] = useState(false);
   const [maintenanceModal, setMaintenanceModal] = useState(false);
   const [maintenanceRoleModal, setMaintenanceRoleModal] = useState(false);
-  const [maintenanceAreaModal, setMaintenanceAreaModal] = useState(false);
-  const [selectedMaintenanceArea, setSelectedMaintenanceArea] = useState("Sede Salvador");
+  const [selectedMaintenanceArea, setSelectedMaintenanceArea] = useState("");
   const [companyModal, setCompanyModal] = useState(false);
   const [editingCompanyId, setEditingCompanyId] = useState("");
   const [roleModal, setRoleModal] = useState(false);
@@ -2731,6 +2855,7 @@ export default function App() {
 
 
   const maintenanceByArea = useMemo(() => {
+    if (!selectedMaintenanceArea) return [];
     return filteredData.maintenance.filter((item) => (item.maintenanceArea || "Sede Salvador") === selectedMaintenanceArea);
   }, [filteredData.maintenance, selectedMaintenanceArea]);
 
@@ -3671,7 +3796,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} onChooseArea={() => setMaintenanceAreaModal(true)} selectedArea={selectedMaintenanceArea} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
+                  {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -3705,7 +3830,7 @@ export default function App() {
                     <p className="text-sm text-slate-500">{obra.cliente} • {obra.local}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-white text-slate-700 border-slate-300">{obra.status}</Badge>
+                    <Badge className={obra.status === "Ativa" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-white text-slate-700 border-slate-300"}>{obra.status}</Badge>
                     <Button
                       variant="outline"
                       className="h-9 px-3 rounded-xl"
@@ -4101,22 +4226,7 @@ export default function App() {
         ) : null}
       </Modal>
 
-            <Modal open={maintenanceAreaModal} title="Escolher área da manutenção" onClose={() => setMaintenanceAreaModal(false)}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {MAINTENANCE_AREAS.map((area) => (
-            <button
-              key={area}
-              type="button"
-              onClick={() => { setSelectedMaintenanceArea(area); setMaintenanceAreaModal(false); }}
-              className={`rounded-2xl border px-4 py-4 text-left transition ${selectedMaintenanceArea === area ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800"}`}
-            >
-              <div className="font-semibold">{area}</div>
-              <div className="text-sm text-slate-500 mt-1">Ver e criar OS desta área.</div>
-            </button>
-          ))}
-        </div>
-      </Modal>
-
+            
 <Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={closeMaintenanceModal}>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
