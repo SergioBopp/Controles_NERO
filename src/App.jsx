@@ -1844,21 +1844,21 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
 }
 
 
+
 function AttendancePage({
   attendance,
   companies,
   roles,
   onBack,
-  onAddPresence,
   onAddCompany,
-  onAddRole,
   onDeletePresence,
-  onDeleteCompany,
   onDeleteRole,
   onEditRole,
   onEditAttendance,
   onDeleteCompanySelector,
   onEditCompanySelector,
+  onOpenNewRoleForCompany,
+  onOpenNewAttendanceForRole,
 }) {
   const grouped = useMemo(() => {
     return companies.map((company) => {
@@ -1886,7 +1886,7 @@ function AttendancePage({
   }, [attendance, companies, roles]);
 
   const totalPresent = grouped.reduce((acc, company) => acc + company.total, 0);
-  const primaryCompanyId = grouped[0]?.company?.id ?? null;
+  const hasCompanies = grouped.length > 0;
 
   return (
     <div className="space-y-6">
@@ -1900,16 +1900,15 @@ function AttendancePage({
             <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAddCompany}>
               Nova empresa
             </Button>
-            <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onAddRole}>
-              Nova função
-            </Button>
-            <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onAddPresence}>
-              Lançar presença
-            </Button>
-            <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEditCompanySelector?.()}>
+            <Button
+              variant="outline"
+              className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              onClick={() => onEditCompanySelector?.()}
+              disabled={!hasCompanies}
+            >
               Editar empresa
             </Button>
-            <Button variant="danger" onClick={() => onDeleteCompanySelector?.()} disabled={!primaryCompanyId}>
+            <Button variant="danger" onClick={() => onDeleteCompanySelector?.()} disabled={!hasCompanies}>
               Excluir empresa
             </Button>
             <ReturnHomeButton onClick={onBack} />
@@ -1946,6 +1945,13 @@ function AttendancePage({
                 <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-lg">
                   {total} presentes
                 </Badge>
+                <Button
+                  variant="outline"
+                  className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                  onClick={() => onOpenNewRoleForCompany(company)}
+                >
+                  Nova função
+                </Button>
               </div>
             </div>
 
@@ -1956,7 +1962,7 @@ function AttendancePage({
                     <tr>
                       <th className="px-6 py-5 text-left text-[1.05rem] font-extrabold text-slate-900">CARGO/FUNÇÃO</th>
                       <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[180px]">PRESENTE</th>
-                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[280px]">AÇÕES</th>
+                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[620px]">AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1965,10 +1971,21 @@ function AttendancePage({
                         <td className="px-6 py-6 text-[1.05rem] text-slate-900">{row.roleName}</td>
                         <td className="px-6 py-6 text-center text-2xl font-extrabold text-slate-900">{row.qty}</td>
                         <td className="px-6 py-6">
-                          <div className="flex flex-col items-center gap-3">
+                          <div className="flex flex-wrap items-center justify-center gap-3">
                             <Button
                               variant="outline"
-                              className="h-12 min-w-[180px] border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              className="h-11 px-4 border-slate-300 text-slate-700 hover:bg-slate-50"
+                              onClick={() => onOpenNewAttendanceForRole({
+                                companyId: row.companyId,
+                                roleId: row.roleId,
+                                qty: row.qty,
+                              })}
+                            >
+                              Lançar presença
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-11 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                               onClick={() => onEditAttendance({
                                 id: row.latestAttendanceId,
                                 companyId: row.companyId,
@@ -1980,7 +1997,7 @@ function AttendancePage({
                             </Button>
                             <Button
                               variant="outline"
-                              className="h-12 min-w-[180px] border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              className="h-11 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                               onClick={() => onEditRole({
                                 id: row.roleId,
                                 companyId: row.companyId,
@@ -1991,7 +2008,7 @@ function AttendancePage({
                             </Button>
                             <Button
                               variant="outline"
-                              className="h-12 min-w-[180px]"
+                              className="h-11 px-4"
                               onClick={() => onDeleteRole(row.roleId)}
                             >
                               Excluir função
@@ -1999,7 +2016,7 @@ function AttendancePage({
                             {row.latestAttendanceId ? (
                               <Button
                                 variant="danger"
-                                className="h-12 min-w-[180px]"
+                                className="h-11 px-4"
                                 onClick={() => onDeletePresence(row.latestAttendanceId)}
                               >
                                 Excluir presença
@@ -2602,6 +2619,14 @@ export default function App() {
   function openAttendanceEdit(record) {
     if (!record) return;
     setAttendanceEditRecord(record);
+    setAttendanceBatchCompanyId(String(record.companyId));
+    setAttendanceBatchQuantities({ [record.roleId]: Number(record.qty || 0) });
+    setAttendanceModal(true);
+  }
+
+  function openAttendanceCreateForRole(record) {
+    if (!record) return;
+    setAttendanceEditRecord(null);
     setAttendanceBatchCompanyId(String(record.companyId));
     setAttendanceBatchQuantities({ [record.roleId]: Number(record.qty || 0) });
     setAttendanceModal(true);
@@ -3569,7 +3594,7 @@ export default function App() {
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
-                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => { setAttendanceEditRecord(null); setAttendanceModal(true); }} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onAddRole={() => { setEditingRoleId(""); setRoleForm({ companyId: "", name: "" }); setRoleModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} />}
+                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
               </AnimatePresence>
