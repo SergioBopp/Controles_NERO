@@ -1855,7 +1855,10 @@ function AttendancePage({
   onDeletePresence,
   onDeleteCompany,
   onDeleteRole,
+  onEditRole,
   onEditAttendance,
+  onDeleteCompanySelector,
+  onEditCompanySelector,
 }) {
   const grouped = useMemo(() => {
     return companies.map((company) => {
@@ -1903,11 +1906,10 @@ function AttendancePage({
             <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onAddPresence}>
               Lançar presença
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => primaryCompanyId && onDeleteCompany(primaryCompanyId)}
-              disabled={!primaryCompanyId}
-            >
+            <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEditCompanySelector?.()}>
+              Editar empresa
+            </Button>
+            <Button variant="danger" onClick={() => onDeleteCompanySelector?.()} disabled={!primaryCompanyId}>
               Excluir empresa
             </Button>
             <ReturnHomeButton onClick={onBack} />
@@ -1975,6 +1977,17 @@ function AttendancePage({
                               })}
                             >
                               Editar presença
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-12 min-w-[180px] border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              onClick={() => onEditRole({
+                                id: row.roleId,
+                                companyId: row.companyId,
+                                name: row.roleName,
+                              })}
+                            >
+                              Editar função
                             </Button>
                             <Button
                               variant="outline"
@@ -2513,11 +2526,15 @@ export default function App() {
 
   const [attendanceModal, setAttendanceModal] = useState(false);
   const [attendanceEditRecord, setAttendanceEditRecord] = useState(null);
+  const [attendanceCompanyActionModal, setAttendanceCompanyActionModal] = useState({ open: false, mode: "delete" });
+  const [attendanceCompanyTargetId, setAttendanceCompanyTargetId] = useState("");
   const [stockModal, setStockModal] = useState(false);
   const [maintenanceModal, setMaintenanceModal] = useState(false);
   const [maintenanceRoleModal, setMaintenanceRoleModal] = useState(false);
   const [companyModal, setCompanyModal] = useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState("");
   const [roleModal, setRoleModal] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState("");
   const [obraModal, setObraModal] = useState(false);
 
   const [attendanceBatchCompanyId, setAttendanceBatchCompanyId] = useState("");
@@ -2588,6 +2605,34 @@ export default function App() {
     setAttendanceBatchCompanyId(String(record.companyId));
     setAttendanceBatchQuantities({ [record.roleId]: Number(record.qty || 0) });
     setAttendanceModal(true);
+  }
+
+  function openAttendanceCompanyAction(mode = "delete") {
+    setAttendanceCompanyTargetId("");
+    setAttendanceCompanyActionModal({ open: true, mode });
+  }
+
+  function openAttendanceCompanyEdit(company) {
+    if (!company) return;
+    setEditingCompanyId(company.id);
+    setCompanyForm({ name: company.name || "", city: company.city || "" });
+    setCompanyModal(true);
+  }
+
+  async function confirmAttendanceCompanyAction() {
+    const companyId = Number(attendanceCompanyTargetId);
+    if (!companyId) return;
+    const target = (filteredData.companies || []).find((company) => Number(company.id) === companyId);
+    if (!target) return;
+
+    if (attendanceCompanyActionModal.mode === "edit") {
+      openAttendanceCompanyEdit(target);
+    } else {
+      await deleteCompany(companyId);
+    }
+
+    setAttendanceCompanyActionModal({ open: false, mode: "delete" });
+    setAttendanceCompanyTargetId("");
   }
 
   const stockCatalogOptions = useMemo(() => {
@@ -2896,29 +2941,64 @@ export default function App() {
   }
 
   async function addCompany() {
-    const payload = { id: generateId(), obraId, name: companyForm.name, city: companyForm.city };
+    const payload = { id: editingCompanyId || generateId(), obraId, name: companyForm.name, city: companyForm.city };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("companies").insert({ id: payload.id, obra_id: payload.obraId, name: payload.name, city: payload.city });
-      if (error) return setErrorMessage(error.message);
+      if (editingCompanyId) {
+        const { error } = await supabase.from("companies").update({ name: payload.name, city: payload.city }).eq("id", editingCompanyId);
+        if (error) return setErrorMessage(error.message);
+      } else {
+        const { error } = await supabase.from("companies").insert({ id: payload.id, obra_id: payload.obraId, name: payload.name, city: payload.city });
+        if (error) return setErrorMessage(error.message);
+      }
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, companies: [...prev.companies, payload] }));
+      if (editingCompanyId) {
+        commitDataUpdate((prev) => ({
+          ...prev,
+          companies: prev.companies.map((company) => sameId(company.id, editingCompanyId) ? payload : company),
+        }));
+      } else {
+        setData((prev) => ({ ...prev, companies: [...prev.companies, payload] }));
+      }
     }
     setCompanyModal(false);
+    setEditingCompanyId("");
     setCompanyForm({ name: "", city: "" });
   }
 
+  function openRoleEditModal(role) {
+    if (!role) return;
+    setEditingRoleId(role.id);
+    setRoleForm({ companyId: String(role.companyId || ""), name: role.name || "" });
+    setRoleModal(true);
+  }
+
   async function addRole() {
-    const payload = { id: generateId(), obraId, companyId: Number(roleForm.companyId), name: roleForm.name };
+    const payload = { id: editingRoleId || generateId(), obraId, companyId: Number(roleForm.companyId), name: roleForm.name };
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("roles").insert({ id: payload.id, obra_id: payload.obraId, company_id: payload.companyId, name: payload.name });
-      if (error) return setErrorMessage(error.message);
+      if (editingRoleId) {
+        const { error } = await supabase
+          .from("roles")
+          .update({ company_id: payload.companyId, name: payload.name })
+          .eq("id", editingRoleId);
+        if (error) return setErrorMessage(error.message);
+      } else {
+        const { error } = await supabase.from("roles").insert({ id: payload.id, obra_id: payload.obraId, company_id: payload.companyId, name: payload.name });
+        if (error) return setErrorMessage(error.message);
+      }
       await fetchAllData();
     } else {
-      setData((prev) => ({ ...prev, roles: [...prev.roles, payload] }));
+      if (editingRoleId) {
+        setData((prev) => ({
+          ...prev,
+          roles: prev.roles.map((role) => sameId(role.id, editingRoleId) ? payload : role),
+        }));
+      } else {
+        setData((prev) => ({ ...prev, roles: [...prev.roles, payload] }));
+      }
     }
 
-    if (String(attendanceBatchCompanyId) === String(payload.companyId)) {
+    if (!editingRoleId && String(attendanceBatchCompanyId) === String(payload.companyId)) {
       setAttendanceBatchQuantities((prev) => ({
         ...getAttendanceQuantitiesForCompany(payload.companyId),
         ...prev,
@@ -2927,6 +3007,7 @@ export default function App() {
     }
 
     setRoleModal(false);
+    setEditingRoleId("");
     setRoleForm({ companyId: "", name: "" });
   }
 
@@ -3488,7 +3569,7 @@ export default function App() {
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
-                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => { setAttendanceEditRecord(null); setAttendanceModal(true); }} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditAttendance={openAttendanceEdit} />}
+                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => { setAttendanceEditRecord(null); setAttendanceModal(true); }} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onAddRole={() => { setEditingRoleId(""); setRoleForm({ companyId: "", name: "" }); setRoleModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
               </AnimatePresence>
@@ -3557,12 +3638,51 @@ export default function App() {
         </div>
       </Modal>
 
-      <Modal open={companyModal} title="Nova empresa" onClose={() => setCompanyModal(false)}>
+      <Modal
+        open={attendanceCompanyActionModal.open}
+        title={attendanceCompanyActionModal.mode === "edit" ? "Selecionar empresa para editar" : "Selecionar empresa para excluir"}
+        onClose={() => setAttendanceCompanyActionModal({ open: false, mode: "delete" })}
+      >
+        <div className="space-y-4">
+          <Field label="Empresa">
+            <select
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+              value={attendanceCompanyTargetId}
+              onChange={(e) => setAttendanceCompanyTargetId(e.target.value)}
+            >
+              <option value="">Selecione uma empresa</option>
+              {(filteredData.companies || []).map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name} {company.city ? `- ${company.city}` : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
+            {attendanceCompanyActionModal.mode === "edit"
+              ? "Escolha a empresa que deseja editar."
+              : "Escolha a empresa que deseja excluir."}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setAttendanceCompanyActionModal({ open: false, mode: "delete" })}>Cancelar</Button>
+            <Button
+              variant={attendanceCompanyActionModal.mode === "delete" ? "danger" : "outline"}
+              className={attendanceCompanyActionModal.mode === "edit" ? "border-emerald-300 text-emerald-800 hover:bg-emerald-50" : ""}
+              disabled={!attendanceCompanyTargetId}
+              onClick={confirmAttendanceCompanyAction}
+            >
+              {attendanceCompanyActionModal.mode === "edit" ? "Abrir edição" : "Excluir empresa"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={companyModal} title={editingCompanyId ? "Editar empresa" : "Nova empresa"} onClose={() => { setCompanyModal(false); setEditingCompanyId(""); }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Nome da empresa"><Input value={companyForm.name} onChange={(e) => setCompanyForm((prev) => ({ ...prev, name: e.target.value }))} /></Field>
           <Field label="Cidade / UF"><Input value={companyForm.city} onChange={(e) => setCompanyForm((prev) => ({ ...prev, city: e.target.value }))} /></Field>
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setCompanyModal(false)}>Cancelar</Button><Button onClick={addCompany} disabled={!companyForm.name || !obraAtual}>Salvar</Button></div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => { setCompanyModal(false); setEditingCompanyId(""); }}>Cancelar</Button><Button onClick={addCompany} disabled={!companyForm.name || !obraAtual}>Salvar</Button></div>
       </Modal>
 
       <Modal open={roleModal} title="Nova função / cargo" onClose={() => setRoleModal(false)}>
@@ -3570,7 +3690,7 @@ export default function App() {
           <Field label="Empresa"><SelectField value={roleForm.companyId} onChange={(value) => setRoleForm((prev) => ({ ...prev, companyId: value }))} options={[{ value: "", label: "Selecione..." }, ...filteredData.companies.map((company) => ({ value: String(company.id), label: company.name }))]} /></Field>
           <Field label="Cargo / função"><Input value={roleForm.name} onChange={(e) => setRoleForm((prev) => ({ ...prev, name: e.target.value }))} /></Field>
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setRoleModal(false)}>Cancelar</Button><Button onClick={addRole} disabled={!roleForm.companyId || !roleForm.name || !obraAtual}>Salvar</Button></div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => { setRoleModal(false); setEditingRoleId(""); }}>Cancelar</Button><Button onClick={addRole} disabled={!roleForm.companyId || !roleForm.name || !obraAtual}>Salvar</Button></div>
       </Modal>
 
 
