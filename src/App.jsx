@@ -1001,6 +1001,19 @@ const STOCK_CODE_CATALOG = [
 ];
 
 
+const MAINTENANCE_AREAS = [
+  "Sede Salvador",
+  "Regional Barreiras",
+  "Regional Feira de Santana",
+  "Regional Guanambi",
+  "Regional Irecê",
+  "Regional Itabuna",
+  "Regional Juazeiro",
+  "Regional Paulo Afonso",
+  "Regional Porto Seguro",
+  "Regional Vitória da Conquista",
+];
+
 const STOCK_UNIT_OPTIONS = [
   "un",
   "m",
@@ -1203,6 +1216,7 @@ function createEmptyMaintenanceForm() {
     os: "",
     service: "",
     requester: "",
+    maintenanceArea: "Sede Salvador",
     requestDate: getTodayISO(),
     realizationDate: "",
     deliveryDate: "",
@@ -1257,6 +1271,7 @@ const totalCost = Math.max(100, calculated);
 
   return {
     ...item,
+    maintenanceArea: item?.maintenanceArea || "Sede Salvador",
     compositionType,
     labor,
     materialCost,
@@ -1729,7 +1744,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
   );
 }
 
-function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, maintenanceRolesCount }) {
+function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, onChooseArea, selectedArea, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
     delayed: items.filter((item) => getMaintenanceStatus(item) === "Atrasado").length,
@@ -1755,13 +1770,14 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
       <Card>
         <CardHeader
           title="Manutenções"
-          description="Controle de OS, composição própria ou terceirizada, BDI e atraso"
+          description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso` }
           right={
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onChooseArea}><Building2 className="h-4 w-4" /> Escolher área</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
@@ -2164,6 +2180,9 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
       doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Área: ${selectedMaintenanceArea || "Sede Salvador"}`, 46, 32);
+      doc.setFont("helvetica", "normal");
       doc.text(`Gerado em: ${generatedAt}`, pw - 14, 24, { align: "right" });
       doc.line(14, 38, pw - 14, 38);
     },
@@ -2432,7 +2451,10 @@ async function exportMaintenanceLandscapePdf(items, obraAtual) {
 
   doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
   doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
-  doc.text(`Valor total do momento: ${formatCurrencyBR(totalValue)}`, 46, 32);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Área: ${selectedMaintenanceArea || "Sede Salvador"}`, 46, 32);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Valor total do momento: ${formatCurrencyBR(totalValue)}`, 140, 32);
   doc.line(14, 38, pageWidth - 14, 38);
 
   const sorted = [...(items || [])].sort((a, b) => {
@@ -2548,6 +2570,8 @@ export default function App() {
   const [stockModal, setStockModal] = useState(false);
   const [maintenanceModal, setMaintenanceModal] = useState(false);
   const [maintenanceRoleModal, setMaintenanceRoleModal] = useState(false);
+  const [maintenanceAreaModal, setMaintenanceAreaModal] = useState(false);
+  const [selectedMaintenanceArea, setSelectedMaintenanceArea] = useState("Sede Salvador");
   const [companyModal, setCompanyModal] = useState(false);
   const [editingCompanyId, setEditingCompanyId] = useState("");
   const [roleModal, setRoleModal] = useState(false);
@@ -2589,7 +2613,7 @@ export default function App() {
       roles: data.roles.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
       maintenanceRoles: data.maintenanceRoles || [],
       stock: data.stock.filter((item) => sameId(item.obraId, obraAtual.id)),
-      maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)),
+      maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)).map((item) => calculateMaintenanceItem(item)),
       attendance: data.attendance.filter((item) => sameId(item.obraId, obraAtual.id)),
       history: data.history.filter((item) => sameId(item.obraId, obraAtual.id)),
     };
@@ -2705,15 +2729,19 @@ export default function App() {
   }
 
 
+  const maintenanceByArea = useMemo(() => {
+    return filteredData.maintenance.filter((item) => (item.maintenanceArea || "Sede Salvador") === selectedMaintenanceArea);
+  }, [filteredData.maintenance, selectedMaintenanceArea]);
+
   const filteredMaintenance = useMemo(() => {
     const rawQuery = search.trim();
-    if (!rawQuery) return filteredData.maintenance;
+    if (!rawQuery) return maintenanceByArea;
 
     const normalizedQuery = rawQuery.toLowerCase();
     const osMatch = normalizedQuery.match(/(?:^|\b)os\s*(\d+)$|^(\d+)$/i);
     const targetOs = osMatch ? String(osMatch[1] || osMatch[2] || "").trim() : "";
 
-    return filteredData.maintenance.filter((item) => {
+    return maintenanceByArea.filter((item) => {
       const itemOs = String(item.os || "").trim();
 
       if (targetOs) {
@@ -2721,6 +2749,7 @@ export default function App() {
       }
 
       return [
+        item.maintenanceArea || "Sede Salvador",
         item.service,
         item.requester,
         item.responsible,
@@ -2731,7 +2760,7 @@ export default function App() {
         .toLowerCase()
         .includes(normalizedQuery);
     });
-  }, [filteredData.maintenance, search]);
+  }, [maintenanceByArea, search]);
 
   async function fetchAllData() {
     if (!isSupabaseConfigured || !onlineMode) {
@@ -2778,6 +2807,7 @@ export default function App() {
           os: row.os,
           service: row.service,
           requester: row.requester,
+          maintenanceArea: row.maintenance_area || "Sede Salvador",
           requestDate: row.request_date,
           realizationDate: row.realization_date,
           deliveryDate: row.delivery_date,
@@ -2884,6 +2914,7 @@ export default function App() {
         os: item.os,
         service: item.service,
         requester: item.requester,
+        maintenance_area: item.maintenanceArea || "Sede Salvador",
         request_date: item.requestDate,
         realization_date: item.realizationDate || null,
         delivery_date: item.deliveryDate || null,
@@ -2948,6 +2979,27 @@ export default function App() {
     if (historyRows.length) {
       const { error } = await supabase.from("history_snapshots").upsert(historyRows);
       if (error) throw error;
+    }
+  }
+
+
+  async function deleteObra(id) {
+    if (!id) return;
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase.from("obras").delete().eq("id", id);
+      if (error) return setErrorMessage(error.message);
+      await fetchAllData();
+    } else {
+      commitDataUpdate((prev) => ({
+        ...prev,
+        obras: prev.obras.filter((obra) => !sameId(obra.id, id)),
+      }));
+    }
+
+    if (sameId(obraId, id)) {
+      const remaining = (data.obras || []).filter((obra) => !sameId(obra.id, id));
+      if (remaining[0]) setObraId(remaining[0].id);
     }
   }
 
@@ -3319,7 +3371,7 @@ export default function App() {
 
   function openNewMaintenanceModal() {
     setEditingMaintenanceId("");
-    setMaintenanceForm(createEmptyMaintenanceForm());
+    setMaintenanceForm({ ...createEmptyMaintenanceForm(), maintenanceArea: selectedMaintenanceArea });
     setMaintenanceModal(true);
   }
 
@@ -3330,6 +3382,7 @@ export default function App() {
       os: normalized.os || "",
       service: normalized.service || "",
       requester: normalized.requester || "",
+      maintenanceArea: normalized.maintenanceArea || "Sede Salvador",
       requestDate: normalized.requestDate || getTodayISO(),
       realizationDate: normalized.realizationDate || "",
       deliveryDate: normalized.deliveryDate || "",
@@ -3370,6 +3423,7 @@ export default function App() {
             os: computed.os,
             service: computed.service,
             requester: computed.requester,
+            maintenance_area: computed.maintenanceArea || "Sede Salvador",
             request_date: computed.requestDate,
             realization_date: computed.realizationDate || null,
             delivery_date: computed.deliveryDate || null,
@@ -3593,7 +3647,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
-                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
+                  {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} onChooseArea={() => setMaintenanceAreaModal(true)} selectedArea={selectedMaintenanceArea} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
@@ -3992,11 +4046,32 @@ export default function App() {
         ) : null}
       </Modal>
 
-      <Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={closeMaintenanceModal}>
+            <Modal open={maintenanceAreaModal} title="Escolher área da manutenção" onClose={() => setMaintenanceAreaModal(false)}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {MAINTENANCE_AREAS.map((area) => (
+            <button
+              key={area}
+              type="button"
+              onClick={() => { setSelectedMaintenanceArea(area); setMaintenanceAreaModal(false); }}
+              className={`rounded-2xl border px-4 py-4 text-left transition ${selectedMaintenanceArea === area ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800"}`}
+            >
+              <div className="font-semibold">{area}</div>
+              <div className="text-sm text-slate-500 mt-1">Ver e criar OS desta área.</div>
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+<Modal open={maintenanceModal} title={editingMaintenanceId ? "Editar manutenção" : "Nova manutenção"} onClose={closeMaintenanceModal}>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <Field label="OS"><Input value={maintenanceForm.os} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, os: e.target.value }))} /></Field>
             <Field label="Serviço"><Input value={maintenanceForm.service} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, service: e.target.value }))} /></Field>
+            <Field label="Área">
+              <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={maintenanceForm.maintenanceArea} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, maintenanceArea: e.target.value }))}>
+                {MAINTENANCE_AREAS.map((area) => <option key={area} value={area}>{area}</option>)}
+              </select>
+            </Field>
             <Field label="Solicitante"><Input value={maintenanceForm.requester} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requester: e.target.value }))} /></Field>
             <Field label="Data solicitação"><Input type="date" value={maintenanceForm.requestDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, requestDate: e.target.value, limitDate: addDaysISO(e.target.value, 7) }))} /></Field>
             <Field label="Data realização do serviço"><Input type="date" value={maintenanceForm.realizationDate} onChange={(e) => setMaintenanceForm((prev) => ({ ...prev, realizationDate: e.target.value }))} /></Field>
