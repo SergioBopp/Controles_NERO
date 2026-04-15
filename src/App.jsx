@@ -1843,89 +1843,169 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
   );
 }
 
-function AttendancePage({ attendance, companies, roles, onBack, onAddPresence, onAddCompany, onAddRole, onDeletePresence, onDeleteCompany, onDeleteRole }) {
+
+function AttendancePage({
+  attendance,
+  companies,
+  roles,
+  onBack,
+  onAddPresence,
+  onAddCompany,
+  onAddRole,
+  onDeletePresence,
+  onDeleteCompany,
+  onDeleteRole,
+  onEditAttendance,
+}) {
   const grouped = useMemo(() => {
     return companies.map((company) => {
       const companyRoles = roles.filter((role) => role.companyId === company.id);
       const rows = companyRoles.map((role) => {
-        const qty = attendance
-          .filter((item) => item.companyId === company.id && item.roleId === role.id)
-          .reduce((acc, item) => acc + Number(item.qty || 0), 0);
+        const companyRoleAttendance = attendance.filter((item) => item.companyId === company.id && item.roleId === role.id);
+        const qty = companyRoleAttendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
 
         return {
+          companyId: company.id,
           roleId: role.id,
           roleName: role.name,
           qty,
-          attendanceIds: attendance.filter((item) => item.companyId === company.id && item.roleId === role.id).map((item) => item.id),
+          attendanceIds: companyRoleAttendance.map((item) => item.id),
+          latestAttendanceId: companyRoleAttendance.length ? companyRoleAttendance[companyRoleAttendance.length - 1].id : null,
         };
       });
 
-      return { company, rows, total: rows.reduce((acc, row) => acc + row.qty, 0) };
+      return {
+        company,
+        rows,
+        total: rows.reduce((acc, row) => acc + row.qty, 0),
+      };
     });
   }, [attendance, companies, roles]);
 
   const totalPresent = grouped.reduce((acc, company) => acc + company.total, 0);
+  const primaryCompanyId = grouped[0]?.company?.id ?? null;
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Presença"
-          description="Controle por empresa e cargo/função no modelo da planilha"
-          right={<div className="flex flex-wrap gap-3"><Button onClick={onAddCompany}>Nova empresa</Button><Button variant="outline" onClick={onAddRole}>Nova função</Button><Button variant="outline" onClick={onAddPresence}>Lançar presença</Button><ReturnHomeButton onClick={onBack} /></div>}
-        />
+      <Card className="overflow-hidden">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 p-6 md:p-7">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Presença</h2>
+            <p className="text-base text-slate-500 mt-1.5">Controle por empresa e cargo/função no modelo da planilha</p>
+          </div>
+          <div className="flex flex-wrap gap-3 xl:justify-end">
+            <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAddCompany}>
+              Nova empresa
+            </Button>
+            <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onAddRole}>
+              Nova função
+            </Button>
+            <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onAddPresence}>
+              Lançar presença
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => primaryCompanyId && onDeleteCompany(primaryCompanyId)}
+              disabled={!primaryCompanyId}
+            >
+              Excluir empresa
+            </Button>
+            <ReturnHomeButton onClick={onBack} />
+          </div>
+        </div>
       </Card>
 
-      <Card>
-        <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3"><div className="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center"><Users className="h-6 w-6" /></div><div><p className="text-sm text-slate-500">Total presente na obra</p><p className="text-3xl font-extrabold text-slate-900">{totalPresent}</p></div></div>
-          <Badge className="bg-white text-slate-700 border-slate-300">Data base: {getTodayBR()}</Badge>
+      <Card className="overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 md:p-7">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-[22px] bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-[0_10px_24px_rgba(16,185,129,0.12)]">
+              <Users className="h-8 w-8" />
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-[0.18em] text-slate-400">Total presente na obra</p>
+              <p className="text-5xl leading-none font-extrabold text-slate-900 mt-2">{totalPresent}</p>
+            </div>
+          </div>
+          <Badge className="bg-white text-slate-700 border-slate-300 px-4 py-2 text-base rounded-2xl">
+            Data base: {getTodayBR()}
+          </Badge>
         </div>
       </Card>
 
       <div className="space-y-6">
         {grouped.map(({ company, rows, total }) => (
-          <Card key={company.id} className="overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 p-5 border-b border-slate-100">
+          <Card key={company.id} className="overflow-hidden shadow-[0_8px_28px_rgba(15,23,42,0.04)]">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 p-6 md:p-7 border-b border-slate-100">
               <div>
-                <h3 className="text-2xl font-bold text-slate-900">{company.name}</h3>
-                <p className="text-sm text-slate-500 mt-1">{company.city}</p>
+                <h3 className="text-[2.1rem] leading-tight font-extrabold text-slate-900">{company.name}</h3>
+                <p className="text-xl text-slate-500 mt-2">{company.city}</p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">{total} presentes</Badge>
-                <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDeleteCompany(company.id)}>Excluir empresa</Button>
+              <div className="flex items-center gap-3 flex-wrap lg:justify-end">
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-lg">
+                  {total} presentes
+                </Badge>
               </div>
             </div>
 
-            <div className="p-5">
-              <div className="overflow-hidden rounded-[24px] border border-slate-200">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-bold text-slate-900">CARGO/FUNÇÃO</th>
-                      <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-900 w-40">PRESENTE</th>
-                      <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-900 w-44">AÇÕES</th>
+            <div className="p-6 md:p-7">
+              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
+                <table className="w-full">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-6 py-5 text-left text-[1.05rem] font-extrabold text-slate-900">CARGO/FUNÇÃO</th>
+                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[180px]">PRESENTE</th>
+                      <th className="px-6 py-5 text-center text-[1.05rem] font-extrabold text-slate-900 w-[280px]">AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.length ? rows.map((row) => (
-                      <tr key={row.roleId} className="bg-white">
-                        <td className="border-b border-slate-200 px-4 py-3 text-base text-slate-800">{row.roleName}</td>
-                        <td className="border-b border-slate-200 px-4 py-3 text-center text-xl font-bold text-slate-900">{row.qty}</td>
-                        <td className="border-b border-slate-200 px-4 py-3">
-                          <div className="flex items-center justify-center gap-2 flex-wrap">
-                            {row.attendanceIds.length ? <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDeletePresence(row.attendanceIds[row.attendanceIds.length - 1])}>Excluir presença</Button> : null}
-                            <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onDeleteRole(row.roleId)}>Excluir função</Button>
+                      <tr key={`${company.id}-${row.roleId}`} className="border-t border-slate-200">
+                        <td className="px-6 py-6 text-[1.05rem] text-slate-900">{row.roleName}</td>
+                        <td className="px-6 py-6 text-center text-2xl font-extrabold text-slate-900">{row.qty}</td>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col items-center gap-3">
+                            <Button
+                              variant="outline"
+                              className="h-12 min-w-[180px] border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              onClick={() => onEditAttendance({
+                                id: row.latestAttendanceId,
+                                companyId: row.companyId,
+                                roleId: row.roleId,
+                                qty: row.qty,
+                              })}
+                            >
+                              Editar presença
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-12 min-w-[180px]"
+                              onClick={() => onDeleteRole(row.roleId)}
+                            >
+                              Excluir função
+                            </Button>
+                            {row.latestAttendanceId ? (
+                              <Button
+                                variant="danger"
+                                className="h-12 min-w-[180px]"
+                                onClick={() => onDeletePresence(row.latestAttendanceId)}
+                              >
+                                Excluir presença
+                              </Button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={3} className="px-4 py-4 text-center text-slate-500">Nenhuma função cadastrada para esta empresa.</td></tr>
+                      <tr>
+                        <td colSpan={3} className="px-6 py-8 text-center text-slate-500">
+                          Nenhuma função cadastrada para esta empresa.
+                        </td>
+                      </tr>
                     )}
-                    <tr className="bg-slate-100">
-                      <td className="px-4 py-3 text-right text-xl font-extrabold text-slate-900">TOTAL</td>
-                      <td className="px-4 py-3 text-center text-2xl font-extrabold text-slate-900">{total}</td>
-                      <td className="px-4 py-3" />
+                    <tr className="bg-slate-100 border-t border-slate-200">
+                      <td className="px-6 py-5 text-right text-2xl font-extrabold text-slate-900">TOTAL</td>
+                      <td className="px-6 py-5 text-center text-3xl font-extrabold text-slate-900">{total}</td>
+                      <td className="px-6 py-5" />
                     </tr>
                   </tbody>
                 </table>
@@ -1937,6 +2017,7 @@ function AttendancePage({ attendance, companies, roles, onBack, onAddPresence, o
     </div>
   );
 }
+
 
 async function buildPdfHeader(doc, title, obraNome, date, generatedAt) {
   const marginLeft = 30;
@@ -3407,7 +3488,7 @@ export default function App() {
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
                   {currentPage === "maintenance" && <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />}
-                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => setAttendanceModal(true)} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} />}
+                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddPresence={() => { setAttendanceEditRecord(null); setAttendanceModal(true); }} onAddCompany={() => setCompanyModal(true)} onAddRole={() => setRoleModal(true)} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditAttendance={openAttendanceEdit} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
               </AnimatePresence>
