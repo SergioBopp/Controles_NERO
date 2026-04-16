@@ -1046,6 +1046,14 @@ function formatCurrencyBR(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
 }
 
+function formatNumberBR(value, options = {}) {
+  return new Intl.NumberFormat("pt-BR", options).format(Number(value || 0));
+}
+
+function formatPercentBR(value, digits = 2) {
+  return `${formatNumberBR(value, { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+}
+
 
 function getStockCatalogEntry(query) {
   const normalized = String(query || "").trim().toLowerCase();
@@ -1775,19 +1783,19 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border border-emerald-200 shadow-[0_14px_34px_rgba(16,185,129,0.07)]">
-        <div className="relative px-6 py-6 md:px-7 md:py-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 text-white">
+      <Card className="overflow-hidden border border-emerald-200 shadow-[0_12px_28px_rgba(16,185,129,0.08)]">
+        <div className="relative px-5 py-5 md:px-6 md:py-6 bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 text-white">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,white,transparent_35%),radial-gradient(circle_at_bottom_left,white,transparent_28%)]" />
-          <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+          <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <div className="max-w-3xl">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80 font-semibold">Mapa operacional</p>
-              <h2 className="text-2xl md:text-3xl font-extrabold mt-2 tracking-tight">Escolher área da manutenção</h2>
-              <p className="text-sm md:text-base text-emerald-50/90 mt-2.5 leading-relaxed">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-emerald-100/80 font-semibold">Mapa operacional</p>
+              <h2 className="mt-2 text-[1.6rem] md:text-[1.9rem] font-extrabold tracking-tight">Escolher área da manutenção</h2>
+              <p className="mt-2 text-sm md:text-[15px] text-emerald-50/90 leading-relaxed">
                 Selecione a sede ou regional para visualizar as OS, gerar relatórios e registrar novas manutenções da área.
               </p>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <Badge className="bg-white/10 text-white border-white/20 px-4 py-2 rounded-2xl text-sm">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <Badge className="bg-white/10 text-white border-white/20 px-3.5 py-1.5 rounded-2xl text-sm">
                 {MAINTENANCE_AREAS.length} áreas disponíveis
               </Badge>
               <ReturnHomeButton onClick={onBack} />
@@ -1808,7 +1816,7 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
             </Badge>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-3">
             {group.items.map((area) => {
               const isSelected = selectedArea === area;
               const isHeadquarters = area === "Sede Salvador";
@@ -1820,15 +1828,15 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
                   type="button"
                   onClick={() => onSelectArea(area)}
                   className={cn(
-                    "group relative overflow-hidden rounded-[22px] border px-5 py-5 text-left transition-all duration-300 shadow-[0_8px_20px_rgba(15,23,42,0.04)]",
+                    "group relative overflow-hidden rounded-[20px] border px-4 py-4 text-left transition-all duration-300 shadow-[0_8px_18px_rgba(15,23,42,0.045)]",
                     isSelected
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-slate-200 bg-white hover:border-emerald-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.07)]"
+                      ? "border-emerald-300 bg-emerald-50/90 shadow-[0_10px_24px_rgba(16,185,129,0.10)]"
+                      : "border-slate-200 bg-white hover:border-emerald-200 hover:-translate-y-0.5 hover:shadow-[0_12px_22px_rgba(15,23,42,0.07)]"
                   )}
                 >
-                  <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_30%)]" />
+                  <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.11),transparent_32%)]" />
                   <div className="relative flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={cn(
                           "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
@@ -1844,30 +1852,40 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-3 text-[1.35rem] leading-tight font-bold text-slate-900">{area}</div>
-                      <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                        Acesse o painel operacional, acompanhe OS e registre novas manutenções desta área.
-                      </p>
-                      <p className="mt-3 text-xs font-semibold text-emerald-800">
-                        Total da área: {formatCurrencyBR(areaTotal)}
-                      </p>
-                    </div>
 
-                    <div className={cn(
-                      "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center border transition-colors",
-                      isHeadquarters
-                        ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-                        : "border-slate-200 bg-slate-100 text-slate-700"
-                    )}>
-                      {isHeadquarters ? <Building2 className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
-                    </div>
-                  </div>
+                      <div className="mt-2.5 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[1.18rem] md:text-[1.24rem] leading-tight font-bold text-slate-900 truncate">
+                            {area}
+                          </div>
+                          <p className="mt-1.5 text-[12px] text-slate-500 leading-relaxed">
+                            Painel operacional da área, com OS, relatórios e novos registros.
+                          </p>
+                        </div>
 
-                  <div className="relative mt-4 flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-slate-600">Ver e criar OS desta área</span>
-                    <span className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 group-hover:border-emerald-200 group-hover:text-emerald-800">
-                      Entrar
-                    </span>
+                        <div className={cn(
+                          "h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center border transition-colors",
+                          isHeadquarters
+                            ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                            : "border-slate-200 bg-slate-100 text-slate-700"
+                        )}>
+                          {isHeadquarters ? <Building2 className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
+                        </div>
+                      </div>
+
+                      <div className="mt-3.5 flex items-end justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3.5 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700/90">Total da área</p>
+                          <p className="mt-1 text-[1.18rem] md:text-[1.22rem] leading-tight font-extrabold text-emerald-800">
+                            {formatCurrencyBR(areaTotal)}
+                          </p>
+                        </div>
+
+                        <span className="inline-flex items-center rounded-xl border border-white/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 group-hover:border-emerald-200 group-hover:text-emerald-800">
+                          Entrar
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </button>
               );
@@ -1878,6 +1896,7 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
     </div>
   );
 }
+
 
 
 function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, selectedArea, onResetArea, maintenanceRolesCount }) {
@@ -1903,28 +1922,71 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Manutenções"
-          description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso`}
-          right={
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-start sm:items-center">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-5 py-2.5 rounded-2xl text-lg font-bold shadow-sm">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge>
-                <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}>Trocar área</Button>
+      <Card className="overflow-hidden border border-emerald-200 shadow-[0_14px_34px_rgba(16,185,129,0.08)]">
+        <div className="relative px-6 py-6 md:px-7 md:py-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 text-white">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,white,transparent_35%),radial-gradient(circle_at_bottom_left,white,transparent_28%)]" />
+          <div className="relative flex flex-col gap-6">
+            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+              <div className="max-w-4xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-50">
+                    Painel da área
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-50">
+                    {sortedItems.length} {sortedItems.length === 1 ? "OS" : "OS"}
+                  </span>
+                </div>
+                <h2 className="mt-3 text-2xl md:text-3xl font-extrabold tracking-tight">{selectedArea}</h2>
+                <p className="text-sm md:text-base text-emerald-50/90 mt-2.5 leading-relaxed">
+                  Controle de OS, composição própria ou terceirizada, BDI e acompanhamento operacional da área selecionada.
+                </p>
               </div>
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0 xl:min-w-[420px]">
+                <div className="rounded-[22px] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-50/80">Total da área</p>
+                  <p className="mt-1.5 text-[1.35rem] md:text-[1.55rem] leading-tight font-extrabold text-white">
+                    {formatCurrencyBR(summary.totalCost)}
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-50/80">Cargos cadastrados</p>
+                  <p className="mt-1.5 text-[1.15rem] md:text-[1.3rem] leading-tight font-bold text-white">
+                    {maintenanceRolesCount}
+                  </p>
+                </div>
               </div>
-              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}><ArrowLeft className="h-4 w-4" /> SEDE/REGIONAIS</Button>
-              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
-              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
-              <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
-              <ReturnHomeButton onClick={onBack} />
             </div>
-          }
-        />
+
+            <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-3">
+              <div className="relative w-full 2xl:max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  className="pl-10 border-white/20 bg-white text-slate-900 placeholder:text-slate-400"
+                  placeholder="Pesquisar OS..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onResetArea}>
+                  <ArrowLeft className="h-4 w-4" /> SEDE/REGIONAIS
+                </Button>
+                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onExportReport}>
+                  <FileText className="h-4 w-4" /> Relatório
+                </Button>
+                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onManageRoles}>
+                  <Briefcase className="h-4 w-4" /> Cargos ({maintenanceRolesCount})
+                </Button>
+                <Button className="border-white/20 bg-white text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>
+                  Nova manutenção
+                </Button>
+                <ReturnHomeButton onClick={onBack} />
+              </div>
+            </div>
+          </div>
+        </div>
       </Card>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -1940,7 +2002,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
             const statusConfig = getMaintenanceStatusConfig(item);
             const isOutsourced = item.compositionType === "outsourced";
             return (
-              <Card key={item.id} className={cn("overflow-hidden border-2", statusConfig.border)}>
+              <Card key={item.id} className={cn("overflow-hidden border border-slate-200 shadow-[0_10px_24px_rgba(15,23,42,0.05)]", statusConfig.border)}>
                 <div className={cn("h-1.5 w-full", statusConfig.stripe)} />
                 <div className="p-5 space-y-4">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -1951,13 +2013,15 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                         <Badge className="bg-white text-slate-700 border-slate-300">{isOutsourced ? "Terceirizada" : "Própria"}</Badge>
                       </div>
                       <h3 className="mt-3 text-lg font-bold text-slate-900 break-words">{item.service || "Serviço não informado"}</h3>
-                      <p className="mt-2 text-sm text-slate-500">Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span></p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span>
+                      </p>
                     </div>
 
-                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 min-w-[220px]">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Custo total</p>
+                    <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white px-4 py-3 min-w-[220px] shadow-sm">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-emerald-700 font-semibold">Custo total</p>
                       <p className="mt-2 text-2xl font-extrabold text-slate-900">{formatCurrencyBR(item.totalCost || item.cost || 0)}</p>
-                                          </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -1980,10 +2044,26 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>Detalhes</Button>
-                    <Button variant="outline" className="h-10 px-4" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportOSPdf(item)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
-                    <Button variant="outline" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}>Editar</Button>
-                    <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>Excluir</Button>
+                    <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>
+                      Detalhes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                      onClick={() => onExportOSPdf(item)}
+                    >
+                      <FileText className="h-4 w-4" /> IMPRIMIR OS
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                      onClick={() => onEdit(item)}
+                    >
+                      Editar
+                    </Button>
+                    <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>
+                      Excluir
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -1991,13 +2071,17 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
           })}
         </div>
       ) : (
-        <Card>
-          <div className="p-10 text-center text-slate-500">Nenhuma manutenção cadastrada para esta obra.</div>
+        <Card className="border border-dashed border-slate-300">
+          <div className="p-10 text-center">
+            <p className="text-base font-semibold text-slate-700">Nenhuma manutenção cadastrada para {selectedArea}.</p>
+            <p className="mt-2 text-sm text-slate-500">Use o botão “Nova manutenção” para iniciar o painel desta área.</p>
+          </div>
         </Card>
       )}
     </div>
   );
 }
+
 
 
 
@@ -2498,7 +2582,7 @@ async function exportMaintenanceOSPdf(item, obraAtual) {
   doc.text(`Data da solicitação: ${formatDateBR(item?.requestDate)}`, 14, 70);
   doc.text(`Data da entrega: ${formatDateBR(item?.deliveryDate)}`, 14, 78);
   doc.text(`Responsável: ${item?.responsible || "-"}`, 14, 86);
-  doc.text(`BDI aplicado: ${Number(item?.bdi || 0).toFixed(2).replace(".", ",")}%`, 14, 94);
+  doc.text(`BDI aplicado: ${formatPercentBR(item?.bdi || 0)}`, 14, 94);
 
   doc.line(14, 100, 196, 100);
 
@@ -4197,7 +4281,7 @@ export default function App() {
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.08em] text-slate-500">BDI</p>
-                    <p className="mt-1 font-semibold text-slate-900">{Number(selectedMaintenanceDetails.bdi || 0).toFixed(2)}%</p>
+                    <p className="mt-1 font-semibold text-slate-900">{formatPercentBR(selectedMaintenanceDetails.bdi || 0)}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs uppercase tracking-[0.08em] text-slate-500">Subtotal</p>
@@ -4217,7 +4301,7 @@ export default function App() {
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                             <div><p className="text-xs uppercase tracking-[0.08em] text-slate-500">Cargo</p><p className="mt-1 font-semibold text-slate-900">{previewLine.roleName || "-"}</p></div>
                             <div><p className="text-xs uppercase tracking-[0.08em] text-slate-500">Diária</p><p className="mt-1 font-semibold text-slate-900">{formatCurrencyBR(previewLine.daily)}</p></div>
-                            <div><p className="text-xs uppercase tracking-[0.08em] text-slate-500">Horas</p><p className="mt-1 font-semibold text-slate-900">{Number(previewLine.hours || 0).toFixed(2)}</p></div>
+                            <div><p className="text-xs uppercase tracking-[0.08em] text-slate-500">Horas</p><p className="mt-1 font-semibold text-slate-900">{formatNumberBR(previewLine.hours || 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
                             <div><p className="text-xs uppercase tracking-[0.08em] text-slate-500">Subtotal</p><p className="mt-1 font-semibold text-slate-900">{formatCurrencyBR(previewLine.subtotal)}</p></div>
                           </div>
                         </div>
@@ -4322,7 +4406,7 @@ export default function App() {
                         </Field>
 
                         <Field label="Valor/hora (R$)">
-                          <Input type="number" value={previewLine.hourly.toFixed(2)} readOnly />
+                          <Input type="number" value={formatNumberBR(previewLine.hourly, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
                         </Field>
 
                         <Field label="Horas consumidas">
@@ -4375,7 +4459,7 @@ export default function App() {
                 <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-5">
                   <p className="text-sm text-slate-500">Valor base do serviço terceirizado</p>
                   <p className="mt-2 text-2xl font-extrabold text-slate-900">{formatCurrencyBR(maintenancePreview.outsourcedServiceCost || 0)}</p>
-                  <p className="mt-2 text-sm text-slate-500">Total final calculado com BDI de {Number(maintenanceForm.bdi || 0).toFixed(2)}%.</p>
+                  <p className="mt-2 text-sm text-slate-500">Total final calculado com BDI de {formatPercentBR(maintenanceForm.bdi || 0)}.</p>
                 </div>
               </div>
             </Card>
@@ -4393,7 +4477,7 @@ export default function App() {
                 <HomeStatCard title="Subtotal" value={formatCurrencyBR(maintenancePreview.subtotal)} subtitle="Base para aplicação do BDI" icon={Package} tone={maintenancePreview.subtotal > 0 ? "default" : "success"} />
               </>
             )}
-            <HomeStatCard title="Total com BDI" value={formatCurrencyBR(maintenancePreview.totalCost)} subtitle={`BDI aplicado: ${Number(maintenanceForm.bdi || 0).toFixed(2)}%`} icon={Briefcase} tone={maintenancePreview.totalCost > 0 ? "danger" : "success"} />
+            <HomeStatCard title="Total com BDI" value={formatCurrencyBR(maintenancePreview.totalCost)} subtitle={`BDI aplicado: ${formatPercentBR(maintenanceForm.bdi || 0)}`} icon={Briefcase} tone={maintenancePreview.totalCost > 0 ? "danger" : "success"} />
           </section>
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="outline" onClick={closeMaintenanceModal}>Cancelar</Button>
