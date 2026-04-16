@@ -1747,7 +1747,8 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
 
 
 
-function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack }) {
+
+function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanceItems = [] }) {
   const groupedAreas = [
     {
       title: "Sede principal",
@@ -1762,6 +1763,15 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack }) {
       tone: "slate",
     },
   ];
+
+  const totalsByArea = useMemo(() => {
+    return MAINTENANCE_AREAS.reduce((acc, area) => {
+      acc[area] = (maintenanceItems || [])
+        .filter((item) => (item.maintenanceArea || "Sede Salvador") === area)
+        .reduce((sum, item) => sum + Number(item.totalCost || item.cost || 0), 0);
+      return acc;
+    }, {});
+  }, [maintenanceItems]);
 
   return (
     <div className="space-y-5">
@@ -1802,6 +1812,7 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack }) {
             {group.items.map((area) => {
               const isSelected = selectedArea === area;
               const isHeadquarters = area === "Sede Salvador";
+              const areaTotal = totalsByArea[area] || 0;
 
               return (
                 <button
@@ -1836,6 +1847,9 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack }) {
                       <div className="mt-3 text-[1.35rem] leading-tight font-bold text-slate-900">{area}</div>
                       <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                         Acesse o painel operacional, acompanhe OS e registre novas manutenções desta área.
+                      </p>
+                      <p className="mt-3 text-xs font-semibold text-emerald-800">
+                        Total da área: {formatCurrencyBR(areaTotal)}
                       </p>
                     </div>
 
@@ -1903,6 +1917,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}><ArrowLeft className="h-4 w-4" /> Áreas</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
@@ -3531,7 +3546,7 @@ export default function App() {
       os: normalized.os || "",
       service: normalized.service || "",
       requester: normalized.requester || "",
-      maintenanceArea: normalized.maintenanceArea || "Sede Salvador",
+      maintenanceArea: normalized.maintenanceArea || selectedMaintenanceArea || "Sede Salvador",
       requestDate: normalized.requestDate || getTodayISO(),
       realizationDate: normalized.realizationDate || "",
       deliveryDate: normalized.deliveryDate || "",
@@ -3561,7 +3576,12 @@ export default function App() {
   );
 
   async function addMaintenanceOrder() {
-    const computed = calculateMaintenanceItem({ id: editingMaintenanceId || generateId(), obraId, ...maintenanceForm });
+    const computed = calculateMaintenanceItem({
+      id: editingMaintenanceId || generateId(),
+      obraId,
+      ...maintenanceForm,
+      maintenanceArea: maintenanceForm.maintenanceArea || selectedMaintenanceArea || "Sede Salvador",
+    });
 
     if (onlineMode && isSupabaseConfigured) {
       if (editingMaintenanceId) {
@@ -3597,6 +3617,7 @@ export default function App() {
           os: computed.os,
           service: computed.service,
           requester: computed.requester,
+          maintenance_area: computed.maintenanceArea || "Sede Salvador",
           request_date: computed.requestDate,
           realization_date: computed.realizationDate || null,
           delivery_date: computed.deliveryDate || null,
@@ -3796,7 +3817,7 @@ export default function App() {
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
-                  {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
+                  {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
