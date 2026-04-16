@@ -1910,14 +1910,14 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
           right={
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-start sm:items-center">
               <div className="flex items-center gap-3 flex-wrap">
-                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 rounded-2xl text-base">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge>
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-5 py-2.5 rounded-2xl text-lg font-bold shadow-sm">Total da área: {formatCurrencyBR(summary.totalCost)}</Badge>
                 <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}>Trocar área</Button>
               </div>
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}><ArrowLeft className="h-4 w-4" /> Áreas</Button>
+              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}><ArrowLeft className="h-4 w-4" /> SEDE/REGIONAIS</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
               <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
               <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
