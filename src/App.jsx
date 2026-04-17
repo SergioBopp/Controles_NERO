@@ -3189,7 +3189,9 @@ async function diariasExportSemanaPdf(semana, lancamentos, resumoPorNome, resumo
     didDrawPage: drawFooter,
   });
 
-  const afterResumo = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 110;
+  doc.addPage();
+  drawFooter();
+  const afterResumo = 20;
 
   autoTable(doc, {
     startY: afterResumo,
