@@ -2934,7 +2934,23 @@ function diariasAgruparPorNome(lista = []) {
   const mapa = new Map();
   for (const item of lista) {
     const chave = `${item.nome}__${item.cpf}`;
-    const atual = mapa.get(chave) || { nome: item.nome, cargo: item.cargo, diaria: Number(item.diaria || 0), cpf: item.cpf, pix: item.pix, total: 0 };
+    const atual = mapa.get(chave) || {
+      nome: item.nome,
+      cargo: item.cargo,
+      diaria: Number(item.diaria || 0),
+      cpf: item.cpf,
+      pix: item.pix,
+      dia: 0,
+      noite: 0,
+      sabado: 0,
+      domingo_feriado: 0,
+      total: 0,
+    };
+    atual.diaria = Number(item.diaria || atual.diaria || 0);
+    atual.dia += Number(item.dia || 0);
+    atual.noite += Number(item.noite || 0);
+    atual.sabado += Number(item.sabado || 0);
+    atual.domingo_feriado += Number(item.domingo_feriado || item.domingoFeriado || 0);
     atual.total += diariasCalcularTotal(item);
     mapa.set(chave, atual);
   }
@@ -3087,6 +3103,81 @@ function diariasPixPlaceholder(tipoPix = "") {
   return "Selecione o tipo da chave PIX";
 }
 
+
+function diariasSanitizeFileName(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9-_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function diariasBuildSemanaTexto(semana) {
+  if (!semana?.semana_inicio || !semana?.semana_fim) return "semana_nao_definida";
+  return `${formatDateBR(semana.semana_inicio)}_a_${formatDateBR(semana.semana_fim)}`.replace(/\//g, "-");
+}
+
+function diariasExportSemanaExcel(semana, resumoPorNome, obraAtual) {
+  const rows = [];
+  rows.push([
+    `SEMANA DE ${semana?.semana_inicio ? formatDateBR(semana.semana_inicio) : "__/__/____"} A ${semana?.semana_fim ? formatDateBR(semana.semana_fim) : "__/__/____"}`
+  ]);
+  rows.push([]);
+  rows.push(["NOME", "CARGO", "DIÁRIA (R$)", "CPF", "CHAVE PIX", "DIA", "NOITE", "SAB", "DOM/FER", "TOTAL (R$)"]);
+
+  const data = resumoPorNome || [];
+  data.forEach((item, index) => {
+    const excelRow = index + 4;
+    rows.push([
+      item.nome || "",
+      item.cargo || "",
+      Number(item.diaria || 0),
+      item.cpf || "",
+      item.pix || "",
+      Number(item.dia || 0),
+      Number(item.noite || 0),
+      Number(item.sabado || 0),
+      Number(item.domingo_feriado || 0),
+      { f: `C${excelRow}*F${excelRow}+(1.5*C${excelRow}*G${excelRow})+(1.5*C${excelRow}*H${excelRow})+(2*C${excelRow}*I${excelRow})` },
+    ]);
+  });
+
+  const totalRow = rows.length + 1;
+  rows.push(["", "", "", "", "", "", "", "", "TOTAL GERAL", { f: `SUM(J4:J${totalRow - 1})` }]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet["!cols"] = [
+    { wch: 28 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 10 },
+    { wch: 16 },
+  ];
+  worksheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
+
+  const ref = XLSX.utils.decode_range(worksheet["!ref"]);
+  for (let r = 3; r <= ref.e.r; r += 1) {
+    const diariaCell = XLSX.utils.encode_cell({ r, c: 2 });
+    const totalCell = XLSX.utils.encode_cell({ r, c: 9 });
+    if (worksheet[diariaCell]) worksheet[diariaCell].z = '"R$" #,##0.00';
+    if (worksheet[totalCell]) worksheet[totalCell].z = '"R$" #,##0.00';
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Diárias");
+
+  const obraNome = diariasSanitizeFileName(obraAtual?.nome || "obra");
+  const semanaNome = diariasSanitizeFileName(diariasBuildSemanaTexto(semana));
+  const hoje = new Date().toISOString().split("T")[0];
+  XLSX.writeFile(workbook, `Diarias_${obraNome}_${semanaNome}_${hoje}.xlsx`);
+}
+
 async function diariasExportSemanaPdf(semana, lancamentos, resumoPorNome, resumoPorCargo, obraAtual) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const generatedAt = getDateTimeBRNoSeconds();
@@ -3220,90 +3311,6 @@ async function diariasExportSemanaPdf(semana, lancamentos, resumoPorNome, resumo
   });
 
   doc.save(`relatorio-diarias-nero-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
-}
-
-
-function diariasSanitizeFileName(value = "") {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
-}
-
-function diariasResumoExcel(lista = []) {
-  const mapa = new Map();
-  for (const item of lista || []) {
-    const chave = `${item.nome}__${item.cpf}`;
-    const atual = mapa.get(chave) || {
-      nome: item.nome || "",
-      cargo: item.cargo || "",
-      diaria: Number(item.diaria || 0),
-      cpf: item.cpf || "",
-      pix: item.pix || "",
-      dia: 0,
-      noite: 0,
-      sabado: 0,
-      domingoFeriado: 0,
-      total: 0,
-    };
-    atual.dia += Number(item.dia || 0);
-    atual.noite += Number(item.noite || 0);
-    atual.sabado += Number(item.sabado || 0);
-    atual.domingoFeriado += Number(item.domingo_feriado || item.domingoFeriado || 0);
-    atual.total += diariasCalcularTotal(item);
-    mapa.set(chave, atual);
-  }
-  return Array.from(mapa.values()).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
-}
-
-function diariasExportSemanaExcel(semana, lancamentos, obraAtual) {
-  const semanaTexto = semana?.semana_inicio && semana?.semana_fim
-    ? `SEMANA DE ${formatDateBR(semana.semana_inicio)} A ${formatDateBR(semana.semana_fim)}`
-    : "SEMANA NÃO DEFINIDA";
-
-  const resumo = diariasResumoExcel(lancamentos || []);
-  const rows = resumo.map((item) => ({
-    NOME: item.nome || "-",
-    CARGO: item.cargo || "-",
-    "DIÁRIA": Number(item.diaria || 0),
-    CPF: item.cpf || "-",
-    "CHAVE PIX": item.pix || "-",
-    DIA: Number(item.dia || 0),
-    NOITE: Number(item.noite || 0),
-    SAB: Number(item.sabado || 0),
-    "DOM/FER": Number(item.domingoFeriado || 0),
-    TOTAL: Number(item.total || 0),
-  }));
-
-  const ws = XLSX.utils.json_to_sheet([]);
-  XLSX.utils.sheet_add_aoa(ws, [[semanaTexto], []], { origin: "A1" });
-  XLSX.utils.sheet_add_json(ws, rows, { origin: "A3", skipHeader: false });
-
-  ws["!cols"] = [
-    { wch: 28 },
-    { wch: 20 },
-    { wch: 12 },
-    { wch: 16 },
-    { wch: 24 },
-    { wch: 7 },
-    { wch: 8 },
-    { wch: 7 },
-    { wch: 10 },
-    { wch: 14 },
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Diarias");
-
-  const obraSlug = diariasSanitizeFileName(obraAtual?.nome || "obra");
-  const inicio = semana?.semana_inicio ? String(semana.semana_inicio) : "semana";
-  const fim = semana?.semana_fim ? String(semana.semana_fim) : "semana";
-  const hoje = new Date().toISOString().slice(0, 10);
-  const fileName = `diarias-${obraSlug}-${inicio}-a-${fim}-${hoje}.xlsx`;
-
-  XLSX.writeFile(wb, fileName);
 }
 
 
@@ -3701,7 +3708,7 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
           <CardHeader
             title="Diárias"
             description={obraAtual ? `Módulo operacional da obra: ${obraAtual.nome}` : "Selecione uma obra"}
-            right={<div className="flex flex-wrap gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={() => setTab(tab === "lancamentos" ? "cargos" : "lancamentos")}>{tab === "lancamentos" ? "Cargos & diárias" : "Lançamentos"}</Button><Button onClick={() => diariasExportSemanaPdf(semanaAtiva, lancamentos, resumoPorNome, resumoPorCargo, obraAtual)}><FileText className="h-4 w-4" /> Relatório PDF</Button><Button variant="outline" onClick={() => diariasExportSemanaExcel(semanaAtiva, lancamentos, obraAtual)}><Download className="h-4 w-4" /> Relatório Excel</Button><Button variant="outline" onClick={handleLogout}>Sair</Button></div>}
+            right={<div className="flex flex-wrap gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={() => setTab(tab === "lancamentos" ? "cargos" : "lancamentos")}>{tab === "lancamentos" ? "Cargos & diárias" : "Lançamentos"}</Button><Button onClick={() => diariasExportSemanaPdf(semanaAtiva, lancamentos, resumoPorNome, resumoPorCargo, obraAtual)}><FileText className="h-4 w-4" /> Relatório PDF</Button><Button variant="outline" onClick={() => diariasExportSemanaExcel(semanaAtiva, resumoPorNome, obraAtual)}><Download className="h-4 w-4" /> Relatório Excel</Button><Button variant="outline" onClick={handleLogout}>Sair</Button></div>}
           />
         </div>
         <div className="p-5 grid grid-cols-1 xl:grid-cols-4 gap-4 bg-slate-50/70">
