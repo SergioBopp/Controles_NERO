@@ -49,6 +49,8 @@ const initialData = {
   maintenance: [],
   stock: [],
   stockMovements: [],
+  stockCategories: ["Material"],
+  stockCodeCatalog: [],
   attendance: [],
   history: [],
 };
@@ -58,6 +60,7 @@ const pages = {
   stock: { label: "Almoxarifado", icon: Package },
   maintenance: { label: "Manutenções", icon: Wrench },
   attendance: { label: "Presença", icon: Users },
+  diarias: { label: "Diárias", icon: Briefcase },
   history: { label: "Histórico", icon: Calendar },
 };
 
@@ -1055,10 +1058,10 @@ function formatPercentBR(value, digits = 2) {
 }
 
 
-function getStockCatalogEntry(query) {
+function getStockCatalogEntry(query, catalog = STOCK_CODE_CATALOG) {
   const normalized = String(query || "").trim().toLowerCase();
   if (!normalized) return null;
-  return STOCK_CODE_CATALOG.find((entry) => {
+  return (catalog || []).find((entry) => {
     const optionLabel = `${entry.code} - ${entry.description}`.toLowerCase();
     return entry.code.toLowerCase() === normalized || optionLabel === normalized;
   }) || null;
@@ -1187,6 +1190,22 @@ function saveStoredAppData(appData) {
 function createPersistableAppData(appData) {
   return {
     ...appData,
+    stockCodeCatalog: Array.from(new Map([
+      ...STOCK_CODE_CATALOG,
+      ...(appData.stockCodeCatalog || []),
+    ].map((entry) => {
+      const code = String(entry?.code || "").trim().toUpperCase();
+      const description = String(entry?.description || "").trim();
+      const category = String(entry?.category || "").trim() || "Material";
+      return [code || `${description}::${category}`, { code, description, category }];
+    })).values())
+      .filter((entry) => entry.code || entry.description)
+      .sort((a, b) => String(a.code || a.description).localeCompare(String(b.code || b.description), "pt-BR")),
+    stockCategories: Array.from(new Set(
+      ["Material", ...(appData.stockCategories || [])]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b, "pt-BR")),
     maintenanceRoles: [...(appData.maintenanceRoles || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR")),
     maintenance: (appData.maintenance || []).map((item) => calculateMaintenanceItem(item)),
   };
@@ -1466,7 +1485,7 @@ function LogoBlock() {
 }
 
 function Sidebar({ currentPage, setCurrentPage }) {
-  const sidebarPages = ["dashboard", "stock", "maintenance", "attendance", "history"];
+  const sidebarPages = ["dashboard", "stock", "diarias", "maintenance", "attendance", "history"];
   return (
     <aside className="hidden md:flex md:w-72 lg:w-[290px] border-r border-emerald-900/40 bg-gradient-to-b from-emerald-800 via-emerald-900 to-emerald-950 flex-col text-white">
       <div className="px-6 py-6 border-b border-white/10 bg-transparent">
@@ -1515,7 +1534,7 @@ function Topbar({
   onExportBackup,
   onImportBackupClick,
 }) {
-  const mobilePages = ["dashboard", "stock", "maintenance", "attendance", "history"];
+  const mobilePages = ["dashboard", "stock", "diarias", "maintenance", "attendance", "history"];
   return (
     <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_24px_rgba(15,23,42,0.04)]">
       <div className="px-5 md:px-8 py-4 flex flex-col gap-4">
@@ -1648,7 +1667,7 @@ function getMaintenanceSortWeight(item) {
   return 4;
 }
 
-function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToHistory }) {
+function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToDiarias, onGoToHistory }) {
   const pendingCount = data.maintenance.filter((item) => getMaintenanceStatus(item) !== "Entregue").length;
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
   const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
@@ -1684,8 +1703,9 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
         </div>
       </Card>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <QuickActionCard icon={Package} title="Almoxarifado" subtitle="Consulta e cadastro de materiais" onClick={onGoToStock} />
+        <QuickActionCard icon={Briefcase} title="Diárias" subtitle="Semanas, cargos e pagamentos" onClick={onGoToDiarias} />
         <QuickActionCard icon={Wrench} title="Manutenções" subtitle="OS, prazo, status e atraso" onClick={onGoToMaintenance} />
         <QuickActionCard icon={Users} title="Presença" subtitle="Lançamento em lote por função" onClick={onGoToAttendance} />
         <QuickActionCard icon={Calendar} title="Histórico" subtitle="Dias fechados e PDFs" onClick={onGoToHistory} />
@@ -1694,60 +1714,148 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition }) {
+  const lowStockCount = stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
+  const categoryCount = new Set(stock.map((item) => String(item.category || "Sem categoria").trim()).filter(Boolean)).size;
+  const totalUnits = stock.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
+  const movementCount = (stockMovements || []).length;
+  const stockBalanceRows = buildStockBalanceRows(stock, stockMovements);
+  const [reportQuery, setReportQuery] = useState("");
+  const [reportCategory, setReportCategory] = useState("Todas");
+
+  const categories = useMemo(
+    () => ["Todas", ...Array.from(new Set(stock.map((item) => String(item.category || "Sem categoria").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }))],
+    [stock]
+  );
+
+  const filteredStockBalanceRows = useMemo(() => {
+    const query = reportQuery.trim().toLowerCase();
+    return stockBalanceRows.filter((row) => {
+      const originalItem = stock.find((item) => sameId(item.id, row.id));
+      const category = String(originalItem?.category || "Sem categoria").trim() || "Sem categoria";
+      const matchesCategory = reportCategory === "Todas" || category === reportCategory;
+      const matchesQuery = !query || String(row.code || "").toLowerCase().includes(query) || String(row.material || "").toLowerCase().includes(query);
+      return matchesCategory && matchesQuery;
+    });
+  }, [reportCategory, reportQuery, stock, stockBalanceRows]);
+
   return (
     <div className="space-y-6">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <HomeStatCard title="Itens cadastrados" value={stock.length} subtitle="Materiais ativos no almoxarifado" icon={Package} />
+        <HomeStatCard title="Estoque baixo" value={lowStockCount} subtitle="Itens abaixo do mínimo" icon={AlertTriangle} alert={lowStockCount > 0} tone={lowStockCount > 0 ? "danger" : "default"} />
+        <HomeStatCard title="Categorias" value={categoryCount} subtitle="Grupos disponíveis para cadastro" icon={LayoutDashboard} />
+        <HomeStatCard title="Movimentações" value={movementCount} subtitle={`Saldo físico somado: ${totalUnits}`} icon={FileText} tone="success" />
+      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
         {stock.map((item) => {
           const parsed = parseStockItemLabel(item.item);
+          const itemMovements = (stockMovements || []).filter((mv) => sameId(mv.itemId, item.id));
           return (
-          <Card key={item.id}>
-            <div className="p-5 space-y-4">
+          <Card key={item.id} className="border border-slate-200 shadow-sm">
+            <div className="p-4 space-y-3.5">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 pr-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm text-slate-500">{item.category}</p>
                     {parsed.code ? <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200">{parsed.code}</Badge> : null}
                   </div>
-                  <h3 className="text-base font-semibold text-slate-900 mt-1">{parsed.description || item.item}</h3>
+                  <h3 className="text-[15px] font-semibold text-slate-900 mt-1 break-words">{parsed.description || item.item}</h3>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Estoque mínimo" : "Normal"}</Badge>
-                  <Button variant="outline" className="h-9 px-3 rounded-xl" onClick={() => onView(item)}><Search className="h-4 w-4" /> Consultar</Button>
-                  <Button variant="outline" className="h-9 px-3 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}><FileText className="h-4 w-4" /> Editar</Button>
-                  <Button variant="outline" className="h-9 px-3 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onMove(item, "entrada")}><Plus className="h-4 w-4" /> Entrada</Button>
-                  <Button variant="outline" className="h-9 px-3 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => onMove(item, "saida")}><ArrowLeft className="h-4 w-4" /> Saída</Button>
-                  <Button variant="danger" className="h-9 px-3 rounded-xl" onClick={() => onDelete(item.id)}>Excluir</Button>
+                <Badge className={Number(item.quantity) < Number(item.min) ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-700 border-slate-200"}>{Number(item.quantity) < Number(item.min) ? "Mínimo" : "Normal"}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" className="h-8 px-2.5 rounded-xl text-[13px]" onClick={() => onView(item)}><Search className="h-4 w-4" /> Consultar</Button>
+                <Button variant="outline" className="h-8 px-2.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-[13px]" onClick={() => onEdit(item)}><FileText className="h-4 w-4" /> Editar</Button>
+                <Button variant="outline" className="h-8 px-2.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-[13px]" onClick={() => onMove(item, "entrada")}><Plus className="h-4 w-4" /> Entrada</Button>
+                <Button variant="outline" className="h-8 px-2.5 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50 text-[13px]" onClick={() => onMove(item, "saida")}><ArrowLeft className="h-4 w-4" /> Saída</Button>
+                <Button variant="danger" className="h-8 px-2.5 rounded-xl text-[13px]" onClick={() => onDelete(item.id)}>Excluir</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-xs text-slate-500">Saldo atual</p><p className="text-lg font-bold text-slate-900 mt-1">{item.quantity} {item.unit}</p></div>
+                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-xs text-slate-500">Mínimo</p><p className="text-lg font-bold text-slate-900 mt-1">{item.min} {item.unit}</p></div>
+                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-xs text-slate-500">Nota fiscal</p><p className="text-sm font-medium text-slate-900 mt-1 break-words">{item.invoice || "-"}</p></div>
+                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-xs text-slate-500">Valor unitário</p><p className="text-sm font-medium text-slate-900 mt-1">{formatCurrencyBR(item.price)}</p></div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-800">Últimas movimentações</p>
+                  <span className="text-xs text-slate-500">{itemMovements.length} registro(s)</span>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Saldo atual</p><p className="text-xl font-bold text-slate-900 mt-1">{item.quantity} {item.unit}</p></div>
-                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Mínimo</p><p className="text-xl font-bold text-slate-900 mt-1">{item.min} {item.unit}</p></div>
-                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Nota fiscal</p><p className="font-medium text-slate-900 mt-1">{item.invoice || "-"}</p></div>
-                <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-sm text-slate-500">Valor unitário</p><p className="font-medium text-slate-900 mt-1">{formatCurrencyBR(item.price)}</p></div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-800">Últimas movimentações</p>
                 <div className="mt-2 space-y-2">
-                  {(stockMovements || []).filter((mv) => sameId(mv.itemId, item.id)).slice(0, 4).map((mv) => (
+                  {itemMovements.slice(0, 3).map((mv) => (
                     <div key={mv.id} className="flex items-center justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <p className="font-medium text-slate-800">{mv.type === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
-                        <p className="text-slate-500 truncate">{mv.responsible || "-"} {mv.note ? `• ${mv.note}` : ""}</p>
+                        <p className="text-slate-500 truncate">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
                       </div>
                       <Badge className={mv.type === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
                         {mv.type === "entrada" ? "+" : "-"} {mv.quantity}
                       </Badge>
                     </div>
                   ))}
-                  {!(stockMovements || []).some((mv) => sameId(mv.itemId, item.id)) ? <p className="text-sm text-slate-500">Sem movimentações registradas.</p> : null}
+                  {!itemMovements.length ? <p className="text-sm text-slate-500">Sem movimentações registradas.</p> : null}
                 </div>
               </div>
             </div>
           </Card>
         )})}
       </div>
+      <Card>
+        <div className="p-5 space-y-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-sm font-semibold tracking-wide text-emerald-700 uppercase">Visualização em tela</p>
+              <h3 className="text-2xl font-bold text-slate-900">Relatório de posição de estoque</h3>
+              <p className="text-sm text-slate-500">Resumo por material com entrada acumulada, saída acumulada e saldo atual.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 xl:items-center">
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  value={reportQuery}
+                  onChange={(e) => setReportQuery(e.target.value)}
+                  placeholder="Buscar código ou material"
+                  className="w-full min-w-[210px] bg-transparent text-sm outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none">
+                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Gerar PDF desta visão</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-emerald-500 text-white">
+                <tr>
+                  <th className="px-4 py-3 text-center font-semibold">CÓDIGO</th>
+                  <th className="px-4 py-3 text-left font-semibold">MATERIAL</th>
+                  <th className="px-4 py-3 text-center font-semibold">ENTRADA</th>
+                  <th className="px-4 py-3 text-center font-semibold">SAÍDA</th>
+                  <th className="px-4 py-3 text-center font-semibold">SALDO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStockBalanceRows.length ? filteredStockBalanceRows.map((row, index) => (
+                  <tr key={row.id || `${row.code}-${index}`} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center font-medium text-slate-700">{row.code}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-slate-800">{row.material}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center text-slate-700">{row.entrada} {row.unit}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center text-slate-700">{row.saida} {row.unit}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">{row.saldo} {row.unit}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-slate-500">Nenhum material encontrado para os filtros aplicados.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -1898,7 +2006,6 @@ function MaintenanceAreaChooser({ selectedArea, onSelectArea, onBack, maintenanc
 }
 
 
-
 function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, onEdit, onView, onManageRoles, onExportReport, onExportOSPdf, selectedArea, onResetArea, maintenanceRolesCount }) {
   const summary = {
     open: items.filter((item) => getMaintenanceStatus(item) !== "Entregue").length,
@@ -1922,71 +2029,31 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden border border-emerald-200 shadow-[0_14px_34px_rgba(16,185,129,0.08)]">
-        <div className="relative px-6 py-6 md:px-7 md:py-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 text-white">
-          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,white,transparent_35%),radial-gradient(circle_at_bottom_left,white,transparent_28%)]" />
-          <div className="relative flex flex-col gap-6">
-            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
-              <div className="max-w-4xl">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-50">
-                    Painel da área
-                  </span>
-                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-50">
-                    {sortedItems.length} {sortedItems.length === 1 ? "OS" : "OS"}
-                  </span>
+      <Card>
+        <CardHeader
+          title="Manutenções"
+          description={`Área atual: ${selectedArea} • Controle de OS, composição própria ou terceirizada, BDI e atraso`}
+          right={
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-start sm:items-center">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-2.5 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700/90">Total da área</p>
+                  <p className="mt-1 text-[1.15rem] leading-tight font-extrabold text-emerald-800">{formatCurrencyBR(summary.totalCost)}</p>
                 </div>
-                <h2 className="mt-3 text-2xl md:text-3xl font-extrabold tracking-tight">{selectedArea}</h2>
-                <p className="text-sm md:text-base text-emerald-50/90 mt-2.5 leading-relaxed">
-                  Controle de OS, composição própria ou terceirizada, BDI e acompanhamento operacional da área selecionada.
-                </p>
+                <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}>Trocar área</Button>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0 xl:min-w-[420px]">
-                <div className="rounded-[22px] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-50/80">Total da área</p>
-                  <p className="mt-1.5 text-[1.35rem] md:text-[1.55rem] leading-tight font-extrabold text-white">
-                    {formatCurrencyBR(summary.totalCost)}
-                  </p>
-                </div>
-                <div className="rounded-[22px] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-50/80">Cargos cadastrados</p>
-                  <p className="mt-1.5 text-[1.15rem] md:text-[1.3rem] leading-tight font-bold text-white">
-                    {maintenanceRolesCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-3">
-              <div className="relative w-full 2xl:max-w-sm">
+              <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  className="pl-10 border-white/20 bg-white text-slate-900 placeholder:text-slate-400"
-                  placeholder="Pesquisar OS..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+                <Input className="pl-10" placeholder="Pesquisar OS..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onResetArea}>
-                  <ArrowLeft className="h-4 w-4" /> SEDE/REGIONAIS
-                </Button>
-                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onExportReport}>
-                  <FileText className="h-4 w-4" /> Relatório
-                </Button>
-                <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={onManageRoles}>
-                  <Briefcase className="h-4 w-4" /> Cargos ({maintenanceRolesCount})
-                </Button>
-                <Button className="border-white/20 bg-white text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>
-                  Nova manutenção
-                </Button>
-                <ReturnHomeButton onClick={onBack} />
-              </div>
+              <Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onResetArea}><ArrowLeft className="h-4 w-4" /> SEDE/REGIONAIS</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportReport}><FileText className="h-4 w-4" /> Relatório</Button>
+              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onManageRoles}><Briefcase className="h-4 w-4" /> Cargos da manutenção ({maintenanceRolesCount})</Button>
+              <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Nova manutenção</Button>
+              <ReturnHomeButton onClick={onBack} />
             </div>
-          </div>
-        </div>
+          }
+        />
       </Card>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -2002,7 +2069,7 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
             const statusConfig = getMaintenanceStatusConfig(item);
             const isOutsourced = item.compositionType === "outsourced";
             return (
-              <Card key={item.id} className={cn("overflow-hidden border border-slate-200 shadow-[0_10px_24px_rgba(15,23,42,0.05)]", statusConfig.border)}>
+              <Card key={item.id} className={cn("overflow-hidden border-2", statusConfig.border)}>
                 <div className={cn("h-1.5 w-full", statusConfig.stripe)} />
                 <div className="p-5 space-y-4">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -2013,15 +2080,13 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                         <Badge className="bg-white text-slate-700 border-slate-300">{isOutsourced ? "Terceirizada" : "Própria"}</Badge>
                       </div>
                       <h3 className="mt-3 text-lg font-bold text-slate-900 break-words">{item.service || "Serviço não informado"}</h3>
-                      <p className="mt-2 text-sm text-slate-500">
-                        Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span>
-                      </p>
+                      <p className="mt-2 text-sm text-slate-500">Solicitante: <span className="font-medium text-slate-700">{item.requester || "-"}</span></p>
                     </div>
 
-                    <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white px-4 py-3 min-w-[220px] shadow-sm">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-emerald-700 font-semibold">Custo total</p>
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 min-w-[220px]">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500 font-semibold">Custo total</p>
                       <p className="mt-2 text-2xl font-extrabold text-slate-900">{formatCurrencyBR(item.totalCost || item.cost || 0)}</p>
-                    </div>
+                                          </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -2044,26 +2109,10 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>
-                      Detalhes
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                      onClick={() => onExportOSPdf(item)}
-                    >
-                      <FileText className="h-4 w-4" /> IMPRIMIR OS
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                      onClick={() => onEdit(item)}
-                    >
-                      Editar
-                    </Button>
-                    <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>
-                      Excluir
-                    </Button>
+                    <Button variant="outline" className="h-10 px-4" onClick={() => onView(item)}>Detalhes</Button>
+                    <Button variant="outline" className="h-10 px-4" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportOSPdf(item)}><FileText className="h-4 w-4" /> IMPRIMIR OS</Button>
+                    <Button variant="outline" className="h-10 px-4 border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onEdit(item)}>Editar</Button>
+                    <Button variant="danger" className="h-10 px-4" onClick={() => onDelete(item.id)}>Excluir</Button>
                   </div>
                 </div>
               </Card>
@@ -2071,17 +2120,13 @@ function MaintenancePage({ items, search, setSearch, onBack, onAdd, onDelete, on
           })}
         </div>
       ) : (
-        <Card className="border border-dashed border-slate-300">
-          <div className="p-10 text-center">
-            <p className="text-base font-semibold text-slate-700">Nenhuma manutenção cadastrada para {selectedArea}.</p>
-            <p className="mt-2 text-sm text-slate-500">Use o botão “Nova manutenção” para iniciar o painel desta área.</p>
-          </div>
+        <Card>
+          <div className="p-10 text-center text-slate-500">Nenhuma manutenção cadastrada para esta obra.</div>
         </Card>
       )}
     </div>
   );
 }
-
 
 
 
@@ -2329,7 +2374,99 @@ function addPageNumbers(doc) {
 }
 
 
-async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
+function buildStockBalanceRows(stockItems = [], stockMovements = []) {
+  return (stockItems || [])
+    .map((item) => {
+      const parsed = parseStockItemLabel(item?.item || "");
+      const itemMovements = (stockMovements || []).filter((mv) => sameId(mv.itemId, item.id));
+      const entrada = itemMovements
+        .filter((mv) => mv.type === "entrada")
+        .reduce((acc, mv) => acc + Number(mv.quantity || 0), 0);
+      const saida = itemMovements
+        .filter((mv) => mv.type === "saida")
+        .reduce((acc, mv) => acc + Number(mv.quantity || 0), 0);
+      return {
+        id: item.id,
+        code: parsed.code || "-",
+        material: parsed.description || item?.item || "-",
+        entrada,
+        saida,
+        saldo: Number(item.quantity || 0),
+        unit: item.unit || "un",
+      };
+    })
+    .sort((a, b) => String(a.code || "").localeCompare(String(b.code || ""), "pt-BR", { numeric: true, sensitivity: "base" }));
+}
+
+async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, selectedAreaLabel = "Almoxarifado") {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const generatedAt = getDateTimeBRNoSeconds();
+  const rows = buildStockBalanceRows(stockItems, stockMovements);
+
+  const drawHeader = () => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    try {
+      doc.addImage(LOGO_BASE64, "PNG", 14, 10, 26, 26);
+    } catch {}
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("RELATÓRIO DE POSIÇÃO DE ESTOQUE - ALMOXARIFADO", 46, 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}`, 46, 32);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
+    doc.line(14, 38, pageWidth - 14, 38);
+  };
+
+  autoTable(doc, {
+    startY: 44,
+    margin: { top: 44, left: 14, right: 14 },
+    tableWidth: "auto",
+    rowPageBreak: "avoid",
+    head: [["CÓDIGO", "MATERIAL", "ENTRADA", "SAÍDA", "SALDO"]],
+    body: rows.length
+      ? rows.map((row) => [
+          row.code,
+          row.material,
+          `${row.entrada} ${row.unit}`,
+          `${row.saida} ${row.unit}`,
+          `${row.saldo} ${row.unit}`,
+        ])
+      : [["-", "Sem materiais cadastrados", "-", "-", "-"]],
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [16, 185, 129],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 28, halign: "center" },
+      1: { cellWidth: 140 },
+      2: { cellWidth: 28, halign: "center" },
+      3: { cellWidth: 28, halign: "center" },
+      4: { cellWidth: 28, halign: "center" },
+    },
+    didDrawPage: drawHeader,
+  });
+
+  addPageNumbers(doc);
+  doc.save(`relatorio-posicao-estoque-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+}
+
+
+async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual, selectedAreaLabel = "Almoxarifado") {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const generatedAt = getDateTimeBRNoSeconds();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -2345,6 +2482,9 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}`, 46, 32);
+  doc.setFont("helvetica", "normal");
   doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
   doc.line(14, 38, pageWidth - 14, 38);
 
@@ -2367,13 +2507,14 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
     startY: 44,
     margin: { left: 14, right: 14 },
     tableWidth: "auto",
+    rowPageBreak: "avoid",
     head: [["DATA", "TIPO", "CÓDIGO", "MATERIAL", "RESPONSÁVEL", "DESTINO / OBS.", "MOV.", "SALDO"]],
     body: body.length ? body : [["-", "-", "-", "Sem movimentações", "-", "-", "-", "-"]],
     theme: "grid",
     styles: {
       font: "helvetica",
-      fontSize: 8,
-      cellPadding: 2,
+      fontSize: 7.5,
+      cellPadding: 1.6,
       overflow: "linebreak",
       valign: "middle",
     },
@@ -2384,14 +2525,14 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
       halign: "center",
     },
     columnStyles: {
-      0: { cellWidth: 24, halign: "center" },
-      1: { cellWidth: 20, halign: "center" },
-      2: { cellWidth: 26, halign: "center" },
-      3: { cellWidth: 85 },
-      4: { cellWidth: 36 },
-      5: { cellWidth: 52 },
-      6: { cellWidth: 20, halign: "center" },
-      7: { cellWidth: 22, halign: "center" },
+      0: { cellWidth: 22, halign: "center" },
+      1: { cellWidth: 18, halign: "center" },
+      2: { cellWidth: 22, halign: "center" },
+      3: { cellWidth: 72 },
+      4: { cellWidth: 30 },
+      5: { cellWidth: 60 },
+      6: { cellWidth: 18, halign: "center" },
+      7: { cellWidth: 18, halign: "center" },
     },
     didDrawPage: function () {
       const pw = doc.internal.pageSize.getWidth();
@@ -2405,7 +2546,7 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual) {
       doc.setFontSize(11);
       doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
       doc.setFont("helvetica", "bold");
-      doc.text(`Área: ${selectedMaintenanceArea || "Sede Salvador"}`, 46, 32);
+      doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}`, 46, 32);
       doc.setFont("helvetica", "normal");
       doc.text(`Gerado em: ${generatedAt}`, pw - 14, 24, { align: "right" });
       doc.line(14, 38, pw - 14, 38);
@@ -2775,6 +2916,871 @@ function HistoryPage({ history, companies, roles, onBack, obraAtual }) {
   );
 }
 
+
+
+const DIARIAS_LOCAL_KEYS = {
+  cargos: "nero_diarias_integradas_cargos",
+  semanas: "nero_diarias_integradas_semanas",
+  lancamentos: "nero_diarias_integradas_lancamentos",
+};
+
+function diariasCalcularTotal(item) {
+  const diaria = Number(item?.diaria || 0);
+  return Number(item?.dia || 0) * diaria + Number(item?.noite || 0) * diaria * 1.5 + Number(item?.sabado || 0) * diaria * 1.5 + Number(item?.domingo_feriado || item?.domingoFeriado || 0) * diaria * 2;
+}
+
+function diariasAgruparPorNome(lista = []) {
+  const mapa = new Map();
+  for (const item of lista) {
+    const chave = `${item.nome}__${item.cpf}`;
+    const atual = mapa.get(chave) || { nome: item.nome, cargo: item.cargo, diaria: Number(item.diaria || 0), cpf: item.cpf, pix: item.pix, total: 0 };
+    atual.total += diariasCalcularTotal(item);
+    mapa.set(chave, atual);
+  }
+  return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function diariasAgruparPorCargo(lista = []) {
+  const mapa = new Map();
+  for (const item of lista) {
+    const atual = mapa.get(item.cargo) || { cargo: item.cargo, colaboradores: new Set(), total: 0 };
+    atual.colaboradores.add(`${item.nome}__${item.cpf}`);
+    atual.total += diariasCalcularTotal(item);
+    mapa.set(item.cargo, atual);
+  }
+  return Array.from(mapa.values()).map((row) => ({ cargo: row.cargo, colaboradores: row.colaboradores.size, total: row.total })).sort((a,b) => b.total-a.total);
+}
+
+async function diariasLoadCargos() {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.from("diarias_cargos").select("*").order("cargo", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+  return JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.cargos) || "[]");
+}
+
+async function diariasLoadSemanas() {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.from("diarias_semanas").select("*").order("semana_inicio", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+  return JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.semanas) || "[]");
+}
+
+async function diariasLoadLancamentos(semanaId) {
+  if (!semanaId) return [];
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.from("diarias_lancamentos").select("*").eq("semana_id", semanaId).order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+  const all = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.lancamentos) || "[]");
+  return all.filter((row) => String(row.semana_id) === String(semanaId));
+}
+
+async function diariasCreateOrSelectSemana(semanaInicio, semanaFim) {
+  if (isSupabaseConfigured) {
+    const { data: existing, error: searchError } = await supabase.from("diarias_semanas").select("*").eq("semana_inicio", semanaInicio).eq("semana_fim", semanaFim).maybeSingle();
+    if (searchError) throw searchError;
+    if (existing) return existing;
+    const { data, error } = await supabase.from("diarias_semanas").insert({ semana_inicio: semanaInicio, semana_fim: semanaFim, status: "aberta" }).select().single();
+    if (error) throw error;
+    return data;
+  }
+  const semanas = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.semanas) || "[]");
+  const existing = semanas.find((row) => row.semana_inicio === semanaInicio && row.semana_fim === semanaFim);
+  if (existing) return existing;
+  const semana = { id: `sem-${Date.now()}`, semana_inicio: semanaInicio, semana_fim: semanaFim, status: "aberta", criada_em: new Date().toISOString() };
+  localStorage.setItem(DIARIAS_LOCAL_KEYS.semanas, JSON.stringify([semana, ...semanas]));
+  return semana;
+}
+
+async function diariasSaveCargo(payload, editId = "") {
+  if (isSupabaseConfigured) {
+    if (editId) {
+      const { error } = await supabase.from("diarias_cargos").update(payload).eq("id", editId);
+      if (error) throw error;
+      return;
+    }
+    const { error } = await supabase.from("diarias_cargos").insert(payload);
+    if (error) throw error;
+    return;
+  }
+  const cargos = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.cargos) || "[]");
+  if (editId) {
+    const next = cargos.map((row) => String(row.id) === String(editId) ? { ...row, ...payload } : row);
+    localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify(next));
+  } else {
+    localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify([...cargos, { id: `cargo-${Date.now()}`, ...payload }]));
+  }
+}
+
+async function diariasDeleteCargo(id) {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("diarias_cargos").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const cargos = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.cargos) || "[]").filter((row) => String(row.id) !== String(id));
+  localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify(cargos));
+}
+
+async function diariasSaveLancamento(payload) {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("diarias_lancamentos").insert(payload);
+    if (error) throw error;
+    return;
+  }
+  const list = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.lancamentos) || "[]");
+  localStorage.setItem(DIARIAS_LOCAL_KEYS.lancamentos, JSON.stringify([{ id: `lan-${Date.now()}`, created_at: new Date().toISOString(), ...payload }, ...list]));
+}
+
+async function diariasDeleteLancamento(id) {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("diarias_lancamentos").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const list = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.lancamentos) || "[]").filter((row) => String(row.id) !== String(id));
+  localStorage.setItem(DIARIAS_LOCAL_KEYS.lancamentos, JSON.stringify(list));
+}
+
+async function diariasUpdateSemana(id, payload) {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("diarias_semanas").update(payload).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const semanas = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.semanas) || "[]").map((row) => String(row.id) === String(id) ? { ...row, ...payload } : row);
+  localStorage.setItem(DIARIAS_LOCAL_KEYS.semanas, JSON.stringify(semanas));
+}
+
+
+
+function diariasFormatCpf(value = "") {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function diariasFormatPixCelular(value = "") {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  const ddd = digits.slice(0, 2);
+  const resto = digits.slice(2);
+  if (!resto) return `(${ddd})`;
+  if (resto.length <= 5) return `(${ddd})-${resto}`;
+  return `(${ddd})-${resto.slice(0, 5)}-${resto.slice(5, 9)}`;
+}
+
+function diariasPixPlaceholder(tipoPix = "") {
+  if (tipoPix === "cpf") return "000.000.000-00";
+  if (tipoPix === "celular") return "(71)-99999-9999";
+  if (tipoPix === "email") return "email@exemplo.com";
+  return "Selecione o tipo da chave PIX";
+}
+
+async function diariasExportSemanaPdf(semana, lancamentos, resumoPorNome, resumoPorCargo, obraAtual) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const generatedAt = getDateTimeBRNoSeconds();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const totalGeral = (resumoPorNome || []).reduce((acc, item) => acc + Number(item.total || 0), 0);
+  const semanaTexto = semana?.semana_inicio && semana?.semana_fim
+    ? `${formatDateBR(semana.semana_inicio)} até ${formatDateBR(semana.semana_fim)}`
+    : "Não definida";
+  const statusTexto = semana?.status === "fechada" ? "Fechada" : "Aberta";
+
+  const drawFooter = () => {
+    const footerY = pageHeight - 8;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(14, footerY - 4, pageWidth - 14, footerY - 4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Emitido em ${generatedAt}`, 14, footerY);
+    doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageWidth - 14, footerY, { align: "right" });
+  };
+
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", 14, 10, 24, 24);
+  } catch {}
+
+  doc.setFillColor(5, 95, 70);
+  doc.roundedRect(42, 10, pageWidth - 56, 26, 4, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(255, 255, 255);
+  doc.text("NERO CONSTRUÇÕES", pageWidth / 2, 20, { align: "center" });
+  doc.setFontSize(13);
+  doc.text("Relatório de Diárias", pageWidth / 2, 29, { align: "center" });
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, 42, pageWidth - 28, 24, 4, 4, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text("OBRA", 18, 49);
+  doc.text("SEMANA", 82, 49);
+  doc.text("STATUS", 170, 49);
+  doc.text("TOTAL GERAL", 214, 49);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(obraAtual?.nome || "Não informada", 18, 57);
+  doc.text(semanaTexto, 82, 57);
+  doc.text(statusTexto, 170, 57);
+
+  doc.setFillColor(220, 252, 231);
+  doc.setDrawColor(167, 243, 208);
+  doc.roundedRect(206, 46, 72, 15, 3, 3, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(6, 95, 70);
+  doc.text(formatCurrencyBR(totalGeral), 274, 56, { align: "right" });
+
+  autoTable(doc, {
+    startY: 74,
+    margin: { left: 14, right: 14, bottom: 16 },
+    head: [["NOME", "CARGO", "DIÁRIA", "CPF", "CHAVE PIX", "TOTAL"]],
+    body: resumoPorNome.length
+      ? resumoPorNome.map((item) => [
+          item.nome,
+          item.cargo,
+          formatCurrencyBR(item.diaria),
+          item.cpf,
+          item.pix,
+          formatCurrencyBR(item.total),
+        ])
+      : [["-", "Sem lançamentos", "-", "-", "-", "-"]],
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2.4,
+      overflow: "linebreak",
+      valign: "middle",
+      textColor: [30, 41, 59],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.15,
+    },
+    headStyles: {
+      fillColor: [5, 95, 70],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      2: { halign: "right" },
+      4: { halign: "center" },
+      5: { halign: "right" },
+    },
+    didDrawPage: drawFooter,
+  });
+
+  const afterResumo = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 110;
+
+  autoTable(doc, {
+    startY: afterResumo,
+    margin: { left: 14, right: 14, bottom: 16 },
+    head: [["CARGO", "COLABORADORES", "TOTAL"]],
+    body: resumoPorCargo.length
+      ? resumoPorCargo.map((item) => [item.cargo, String(item.colaboradores), formatCurrencyBR(item.total)])
+      : [["-", "0", "R$ 0,00"]],
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2.4,
+      textColor: [30, 41, 59],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.15,
+    },
+    headStyles: {
+      fillColor: [5, 95, 70],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: { 1: { halign: "center" }, 2: { halign: "right" } },
+    didDrawPage: drawFooter,
+  });
+
+  doc.save(`relatorio-diarias-nero-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+}
+
+
+
+function DiariasAuthCard({ onBack, email, password, setEmail, setPassword, onLogin, loading, error }) {
+  return (
+    <div className="space-y-6">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+          <CardHeader
+            title="Diárias"
+            description="Acesso restrito. Faça login para visualizar valores e salários."
+            right={<ReturnHomeButton onClick={onBack} />}
+          />
+        </div>
+        <div className="p-6 bg-white max-w-xl">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 mb-4">
+            Este módulo é restrito. Somente usuários autorizados podem acessar informações de diárias.
+          </div>
+          {error ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 mb-4">
+              {error}
+            </div>
+          ) : null}
+          <form className="space-y-4" onSubmit={onLogin}>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                placeholder="seuemail@empresa.com"
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                placeholder="Sua senha"
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="pt-2">
+              <Button type="submit" disabled={loading}>
+                {loading ? "Entrando..." : "Entrar em Diárias"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function DiariasPageIntegrada({ onBack, obraAtual }) {
+  const [tab, setTab] = useState("lancamentos");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [cargos, setCargos] = useState([]);
+  const [semanas, setSemanas] = useState([]);
+  const [semanaAtivaId, setSemanaAtivaId] = useState("");
+  const [lancamentos, setLancamentos] = useState([]);
+  const [filtro, setFiltro] = useState("");
+  const [cargoEditandoId, setCargoEditandoId] = useState("");
+  const [cargoForm, setCargoForm] = useState({ cargo: "", diaria: "" });
+  const [form, setForm] = useState({ semanaInicio: "", semanaFim: "", nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 });
+  const [authLoading, setAuthLoading] = useState(true);
+  const [diariasSession, setDiariasSession] = useState(null);
+  const [authProfile, setAuthProfile] = useState(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  useEffect(() => {
+    if (form.tipoPix === "cpf") {
+      setForm((prev) => ({ ...prev, pix: prev.cpf }));
+    }
+  }, [form.cpf, form.tipoPix]);
+
+  const semanaAtiva = useMemo(() => semanas.find((row) => String(row.id) === String(semanaAtivaId)) || null, [semanas, semanaAtivaId]);
+  const semanaFechada = semanaAtiva?.status === "fechada";
+
+  useEffect(() => {
+    if (form.pixTipo === "cpf") {
+      setForm((prev) => {
+        if (prev.pix === prev.cpf) return prev;
+        return { ...prev, pix: prev.cpf };
+      });
+    }
+  }, [form.cpf, form.pixTipo]);
+
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setAuthLoading(false);
+      setError("Supabase não configurado para o módulo de Diárias.");
+      return;
+    }
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setDiariasSession(data?.session || null);
+      setAuthLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setDiariasSession(session || null);
+      setAuthLoading(false);
+    });
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfile() {
+      if (!diariasSession?.user?.id) {
+        setAuthProfile(null);
+        return;
+      }
+      setLoading(true);
+      const { data, error: profileError } = await supabase
+        .from("perfis_app")
+        .select("id, nome, role")
+        .eq("id", diariasSession.user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (profileError) {
+        console.error(profileError);
+        setAuthProfile(null);
+        setError("Seu usuário não possui perfil de acesso para Diárias.");
+      } else {
+        setAuthProfile(data || null);
+      }
+      setLoading(false);
+    }
+    loadProfile();
+    return () => { cancelled = true; };
+  }, [diariasSession?.user?.id]);
+
+  const isDiariasAdmin = authProfile?.role === "admin";
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+      if (signInError) throw signInError;
+      setLoginPassword("");
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Não foi possível entrar em Diárias.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleLogout() {
+    setSaving(true);
+    try {
+      await supabase.auth.signOut();
+      setDiariasSession(null);
+      setAuthProfile(null);
+      setCargos([]);
+      setSemanas([]);
+      setLancamentos([]);
+      setSemanaAtivaId("");
+      setLoginPassword("");
+      setError("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function recarregarBase(preferSemanaId = "") {
+    setLoading(true);
+    setError("");
+    try {
+      const [cargosData, semanasData] = await Promise.all([diariasLoadCargos(), diariasLoadSemanas()]);
+      setCargos(cargosData || []);
+      setSemanas(semanasData || []);
+      const alvo = preferSemanaId || semanaAtivaId || semanasData.find((row) => row.status === "aberta")?.id || semanasData[0]?.id || "";
+      setSemanaAtivaId(alvo ? String(alvo) : "");
+      if (alvo) {
+        const list = await diariasLoadLancamentos(alvo);
+        setLancamentos(list || []);
+        const semana = (semanasData || []).find((row) => String(row.id) === String(alvo));
+        if (semana) {
+          setForm((prev) => ({ ...prev, semanaInicio: semana.semana_inicio, semanaFim: semana.semana_fim }));
+        }
+      } else {
+        setLancamentos([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Erro ao carregar diárias.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!diariasSession?.user?.id || !isDiariasAdmin) return;
+    recarregarBase();
+  }, [diariasSession?.user?.id, isDiariasAdmin]);
+
+  useEffect(() => {
+    if (!diariasSession?.user?.id || !isDiariasAdmin || !semanaAtivaId) return;
+    diariasLoadLancamentos(semanaAtivaId)
+      .then(setLancamentos)
+      .catch((err) => setError(err.message || "Erro ao carregar lançamentos."));
+  }, [diariasSession?.user?.id, isDiariasAdmin, semanaAtivaId]);
+
+  const listaFiltrada = useMemo(() => {
+    const termo = filtro.trim().toLowerCase();
+    if (!termo) return lancamentos;
+    return lancamentos.filter((item) => [item.nome, item.cargo, item.cpf, item.pix].filter(Boolean).some((campo) => String(campo).toLowerCase().includes(termo)));
+  }, [lancamentos, filtro]);
+  const resumoPorNome = useMemo(() => diariasAgruparPorNome(listaFiltrada), [listaFiltrada]);
+  const resumoPorCargo = useMemo(() => diariasAgruparPorCargo(lancamentos), [lancamentos]);
+  const totalGeral = useMemo(() => listaFiltrada.reduce((acc, item) => acc + diariasCalcularTotal(item), 0), [listaFiltrada]);
+
+  async function handleCriarOuSelecionarSemana() {
+    if (!form.semanaInicio || !form.semanaFim) return setError("Preencha Semana de e Até.");
+    setSaving(true); setError("");
+    try {
+      const semana = await diariasCreateOrSelectSemana(form.semanaInicio, form.semanaFim);
+      await recarregarBase(String(semana.id));
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao criar/selecionar semana.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleSalvarCargo(e) {
+    e.preventDefault();
+    if (!cargoForm.cargo.trim() || !Number(cargoForm.diaria || 0)) return setError("Informe cargo e diária.");
+    setSaving(true); setError("");
+    try {
+      await diariasSaveCargo({ cargo: cargoForm.cargo.trim(), diaria: Number(cargoForm.diaria || 0) }, cargoEditandoId);
+      setCargoForm({ cargo: "", diaria: "" });
+      setCargoEditandoId("");
+      await recarregarBase(semanaAtivaId);
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao salvar cargo.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleExcluirCargo(id) {
+    if (!window.confirm("Deseja excluir este cargo?")) return;
+    setSaving(true); setError("");
+    try {
+      await diariasDeleteCargo(id);
+      await recarregarBase(semanaAtivaId);
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao excluir cargo.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleSalvarLancamento(e) {
+    e.preventDefault();
+    if (!semanaAtiva) return setError("Crie ou selecione uma semana primeiro.");
+    if (semanaFechada) return setError("A semana está fechada.");
+    if (!form.nome.trim() || !form.cargo.trim() || !Number(form.diaria || 0) || !form.pixTipo || !form.pix.trim()) return setError("Preencha nome, cargo, diária e a chave PIX.");
+    if (String(form.cpf || "").replace(/\D/g, "").length !== 11) return setError("Informe um CPF válido.");
+    if ([form.dia, form.noite, form.sabado, form.domingoFeriado].every((n) => Number(n || 0) === 0)) return setError("Informe ao menos uma diária.");
+    setSaving(true); setError("");
+    try {
+      await diariasSaveLancamento({ semana_id: semanaAtiva.id, nome: form.nome.trim(), cargo: form.cargo.trim(), diaria: Number(form.diaria || 0), cpf: form.cpf, pix: form.pix.trim(), dia: Number(form.dia || 0), noite: Number(form.noite || 0), sabado: Number(form.sabado || 0), domingo_feriado: Number(form.domingoFeriado || 0) });
+      setForm((prev) => ({ ...prev, nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 }));
+      await recarregarBase(semanaAtivaId);
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao salvar lançamento.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleExcluirLancamento(id) {
+    if (semanaFechada) return setError("A semana está fechada.");
+    if (!window.confirm("Deseja excluir este lançamento?")) return;
+    setSaving(true); setError("");
+    try {
+      await diariasDeleteLancamento(id);
+      await recarregarBase(semanaAtivaId);
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao excluir lançamento.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleFecharReabrirSemana() {
+    if (!semanaAtiva) return setError("Selecione uma semana.");
+    setSaving(true); setError("");
+    try {
+      if (semanaFechada) {
+        await diariasUpdateSemana(semanaAtiva.id, { status: "aberta", reaberta_em: new Date().toISOString() });
+      } else {
+        await diariasUpdateSemana(semanaAtiva.id, { status: "fechada", fechada_em: new Date().toISOString() });
+      }
+      await recarregarBase(semanaAtivaId);
+    } catch (err) {
+      console.error(err); setError(err.message || "Erro ao atualizar a semana.");
+    } finally { setSaving(false); }
+  }
+
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="space-y-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+            <CardHeader title="Diárias" description="Supabase não configurado." right={<ReturnHomeButton onClick={onBack} />} />
+          </div>
+          <div className="p-6 bg-white text-sm text-slate-600">Configure o Supabase para usar o módulo de Diárias com login restrito.</div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (authLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+            <CardHeader title="Diárias" description="Verificando acesso..." right={<ReturnHomeButton onClick={onBack} />} />
+          </div>
+          <div className="p-6 bg-white text-sm text-slate-600">Carregando autenticação do módulo.</div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!diariasSession) {
+    return (
+      <DiariasAuthCard
+        onBack={onBack}
+        email={loginEmail}
+        password={loginPassword}
+        setEmail={setLoginEmail}
+        setPassword={setLoginPassword}
+        onLogin={handleLogin}
+        loading={saving}
+        error={error}
+      />
+    );
+  }
+
+  if (loading && !authProfile) {
+    return (
+      <div className="space-y-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+            <CardHeader title="Diárias" description="Carregando permissões..." right={<div className="flex gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={handleLogout}>Sair</Button></div>} />
+          </div>
+          <div className="p-6 bg-white text-sm text-slate-600">Validando perfil do usuário.</div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isDiariasAdmin) {
+    return (
+      <div className="space-y-6">
+        <Card className="overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+            <CardHeader
+              title="Diárias"
+              description="Acesso restrito ao administrador do sistema."
+              right={<div className="flex gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={handleLogout}>Sair</Button></div>}
+            />
+          </div>
+          <div className="p-6 bg-white">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Seu usuário não tem permissão para visualizar valores de diárias e salários.
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
+          <CardHeader
+            title="Diárias"
+            description={obraAtual ? `Módulo operacional da obra: ${obraAtual.nome}` : "Selecione uma obra"}
+            right={<div className="flex flex-wrap gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={() => setTab(tab === "lancamentos" ? "cargos" : "lancamentos")}>{tab === "lancamentos" ? "Cargos & diárias" : "Lançamentos"}</Button><Button onClick={() => diariasExportSemanaPdf(semanaAtiva, lancamentos, resumoPorNome, resumoPorCargo, obraAtual)}><FileText className="h-4 w-4" /> Relatório PDF</Button><Button variant="outline" onClick={handleLogout}>Sair</Button></div>}
+          />
+        </div>
+        <div className="p-5 grid grid-cols-1 xl:grid-cols-4 gap-4 bg-slate-50/70">
+          <div className="rounded-2xl bg-white border border-slate-200 px-4 py-4 shadow-sm"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Semana atual</p><p className="text-lg font-semibold mt-1 text-slate-900">{semanaAtiva ? `${formatDateBR(semanaAtiva.semana_inicio)} até ${formatDateBR(semanaAtiva.semana_fim)}` : "Não definida"}</p></div>
+          <div className="rounded-2xl bg-white border border-slate-200 px-4 py-4 shadow-sm"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Status</p><p className="text-lg font-semibold mt-1 text-slate-900">{semanaFechada ? "Fechada" : "Aberta"}</p></div>
+          <div className="rounded-2xl bg-white border border-slate-200 px-4 py-4 shadow-sm"><p className="text-[11px] text-slate-500 uppercase tracking-[0.08em]">Colaboradores</p><p className="text-lg font-semibold mt-1 text-slate-900">{resumoPorNome.length}</p></div>
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-4 shadow-sm"><p className="text-[11px] text-emerald-700 uppercase tracking-[0.08em]">Total geral</p><p className="text-2xl font-bold mt-1 text-emerald-900">{formatCurrencyBR(totalGeral)}</p></div>
+        </div>
+        {error ? <div className="px-5 pb-5 bg-slate-50/70"><div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div></div> : null}
+      </Card>
+
+      {tab === "lancamentos" ? (
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-5">
+            <Card className="overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200">
+                <CardHeader title="Semana e lançamento" description="Crie ou selecione a semana ativa e registre as diárias." right={<div className="flex gap-2"><Button variant="outline" onClick={handleCriarOuSelecionarSemana} disabled={saving}>Criar / Selecionar semana</Button><Button variant="outline" onClick={handleFecharReabrirSemana} disabled={saving || !semanaAtiva}>{semanaFechada ? "Reabrir semana" : "Fechar semana"}</Button></div>} />
+              </div>
+              <div className="p-5 space-y-5 bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Semana de"><Input type="date" value={form.semanaInicio} onChange={(e) => setForm((prev) => ({ ...prev, semanaInicio: e.target.value }))} disabled={!!semanaAtivaId} /></Field>
+                  <Field label="Até"><Input type="date" value={form.semanaFim} onChange={(e) => setForm((prev) => ({ ...prev, semanaFim: e.target.value }))} disabled={!!semanaAtivaId} /></Field>
+                </div>
+                <form className="space-y-4" onSubmit={handleSalvarLancamento}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <Field label="Nome"><Input value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="Cargo padrão"><SelectField value={form.cargoPadrao} onChange={(value) => { const cargo = cargos.find((row) => row.cargo === value); setForm((prev) => ({ ...prev, cargoPadrao: value, cargo: cargo?.cargo || prev.cargo, diaria: cargo?.diaria || prev.diaria })); }} options={[{ value: "", label: "Selecionar" }, ...cargos.map((row) => ({ value: row.cargo, label: row.cargo }))]} /></Field>
+                    <Field label="Cargo"><Input value={form.cargo} onChange={(e) => setForm((prev) => ({ ...prev, cargo: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="Diária base (R$)"><Input type="number" step="0.01" value={form.diaria} onChange={(e) => setForm((prev) => ({ ...prev, diaria: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="CPF"><Input value={form.cpf} placeholder="000.000.000-00" onChange={(e) => setForm((prev) => ({ ...prev, cpf: diariasFormatCpf(e.target.value) }))} disabled={semanaFechada} /></Field>
+                    <Field label="Tipo chave PIX">
+                      <SelectField
+                        value={form.pixTipo}
+                        onChange={(value) => setForm((prev) => {
+                          const nextTipo = value;
+                          let nextPix = prev.pix;
+                          if (nextTipo === "cpf") nextPix = prev.cpf;
+                          else if (prev.pixTipo === "cpf") nextPix = "";
+                          return { ...prev, pixTipo: nextTipo, pix: nextPix };
+                        })}
+                        options={[
+                          { value: "", label: "Selecionar" },
+                          { value: "cpf", label: "CPF" },
+                          { value: "celular", label: "Celular" },
+                          { value: "email", label: "E-mail" },
+                        ]}
+                        disabled={semanaFechada}
+                      />
+                    </Field>
+                    <Field label="Chave PIX">
+                      <Input
+                        value={form.pix}
+                        placeholder={diariasPixPlaceholder(form.pixTipo)}
+                        onChange={(e) => setForm((prev) => {
+                          if (prev.pixTipo === "cpf") {
+                            const cpf = diariasFormatCpf(e.target.value);
+                            return { ...prev, cpf, pix: cpf };
+                          }
+                          if (prev.pixTipo === "celular") {
+                            return { ...prev, pix: diariasFormatPixCelular(e.target.value) };
+                          }
+                          return { ...prev, pix: e.target.value };
+                        })}
+                        disabled={semanaFechada || !form.pixTipo}
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Field label="Dia"><Input type="number" min="0" value={form.dia} onChange={(e) => setForm((prev) => ({ ...prev, dia: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="Noite"><Input type="number" min="0" value={form.noite} onChange={(e) => setForm((prev) => ({ ...prev, noite: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="Sábado"><Input type="number" min="0" value={form.sabado} onChange={(e) => setForm((prev) => ({ ...prev, sabado: e.target.value }))} disabled={semanaFechada} /></Field>
+                    <Field label="Dom/Feriado"><Input type="number" min="0" value={form.domingoFeriado} onChange={(e) => setForm((prev) => ({ ...prev, domingoFeriado: e.target.value }))} disabled={semanaFechada} /></Field>
+                  </div>
+                  <div className="flex justify-end"><Button disabled={saving || semanaFechada}>{saving ? "Salvando..." : "Adicionar lançamento"}</Button></div>
+                </form>
+              </div>
+            </Card>
+            <Card className="overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200">
+                <CardHeader title="Histórico de semanas" description="Selecione a semana ativa para visualizar e operar." />
+              </div>
+              <div className="p-5 space-y-3 bg-white">
+                {loading ? <p className="text-sm text-slate-500">Carregando...</p> : null}
+                {!loading && !semanas.length ? <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 text-center">Nenhuma semana cadastrada.</div> : null}
+                {semanas.map((item) => {
+                  const active = String(item.id) === String(semanaAtivaId);
+                  return (
+                    <button key={item.id} onClick={() => setSemanaAtivaId(String(item.id))} className={cn("w-full rounded-2xl border px-4 py-3 text-left transition-colors", active ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50")}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{formatDateBR(item.semana_inicio)} até {formatDateBR(item.semana_fim)}</p>
+                          <p className="text-xs text-slate-500 mt-1">Status: {item.status === "fechada" ? "Fechada" : "Aberta"}</p>
+                        </div>
+                        <Badge className={item.status === "fechada" ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-emerald-100 text-emerald-800 border-emerald-200"}>{item.status === "fechada" ? "Fechada" : "Aberta"}</Badge>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-5">
+            <Card>
+              <CardHeader title="Resumo por colaborador" description="Consolidado da semana selecionada." right={<Input className="w-72" placeholder="Buscar por nome, cargo, CPF ou PIX" value={filtro} onChange={(e) => setFiltro(e.target.value)} />} />
+              <div className="overflow-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead><tr className="text-left border-b border-slate-200 bg-slate-50"><th className="px-5 py-3">Nome</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3 text-right">Diária</th><th className="px-5 py-3">CPF</th><th className="px-5 py-3 text-center">PIX</th><th className="px-5 py-3 text-right">Total</th></tr></thead>
+                  <tbody>
+                    {resumoPorNome.map((item) => <tr key={`${item.nome}-${item.cpf}`} className="border-b border-slate-100"><td className="px-5 py-3 font-semibold text-slate-900">{item.nome}</td><td className="px-5 py-3">{item.cargo}</td><td className="px-5 py-3 text-right">{formatCurrencyBR(item.diaria)}</td><td className="px-5 py-3">{item.cpf}</td><td className="px-5 py-3 text-center">{item.pix}</td><td className="px-5 py-3 text-right font-semibold">{formatCurrencyBR(item.total)}</td></tr>)}
+                    {!resumoPorNome.length ? <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">Nenhum lançamento encontrado.</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            <Card>
+              <CardHeader title="Resumo por cargo" description="Custo por função na semana selecionada." />
+              <div className="overflow-auto">
+                <table className="w-full min-w-[420px] text-sm">
+                  <thead><tr className="text-left border-b border-slate-200 bg-slate-50"><th className="px-5 py-3">Cargo</th><th className="px-5 py-3 text-center">Colab.</th><th className="px-5 py-3 text-right">Total</th></tr></thead>
+                  <tbody>
+                    {resumoPorCargo.map((item) => <tr key={item.cargo} className="border-b border-slate-100"><td className="px-5 py-3 font-semibold text-slate-900">{item.cargo}</td><td className="px-5 py-3 text-center">{item.colaboradores}</td><td className="px-5 py-3 text-right font-semibold">{formatCurrencyBR(item.total)}</td></tr>)}
+                    {!resumoPorCargo.length ? <tr><td colSpan={3} className="px-5 py-8 text-center text-slate-500">Nenhum cargo encontrado.</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200">
+              <CardHeader title="Lançamentos detalhados" description="Base da semana para conferência e exclusão." />
+            </div>
+            <div className="p-5 space-y-3 bg-white">
+              {listaFiltrada.map((item) => <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"><div><p className="font-semibold text-slate-900">{item.nome}</p><p className="text-sm text-slate-500 mt-1">{item.cargo} • Diária {formatCurrencyBR(item.diaria)} • CPF {item.cpf}</p><p className="text-sm text-slate-500 mt-1">Dia {item.dia || 0} • Noite {item.noite || 0} • Sábado {item.sabado || 0} • Dom/Feriado {item.domingo_feriado || 0}</p></div><div className="flex items-center gap-3"><div className="text-lg font-bold text-slate-900">{formatCurrencyBR(diariasCalcularTotal(item))}</div><Button variant="danger" onClick={() => handleExcluirLancamento(item.id)} disabled={saving || semanaFechada}>Excluir</Button></div></div>)}
+              {!listaFiltrada.length ? <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500 text-center">Nenhum lançamento cadastrado ainda.</div> : null}
+            </div>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardHeader title="Cargos & diárias" description="Cadastre, edite ou exclua cargos e diárias padrão." />
+          <div className="p-5 space-y-5">
+            <form className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto_auto] gap-4 items-end" onSubmit={handleSalvarCargo}>
+              <Field label="Cargo"><Input value={cargoForm.cargo} onChange={(e) => setCargoForm((prev) => ({ ...prev, cargo: e.target.value }))} /></Field>
+              <Field label="Diária padrão (R$)"><Input type="number" step="0.01" value={cargoForm.diaria} onChange={(e) => setCargoForm((prev) => ({ ...prev, diaria: e.target.value }))} /></Field>
+              <Button disabled={saving}>{cargoEditandoId ? "Salvar alteração" : "Adicionar cargo"}</Button>
+              {cargoEditandoId ? <Button variant="outline" type="button" onClick={() => { setCargoEditandoId(""); setCargoForm({ cargo: "", diaria: "" }); }}>Cancelar</Button> : <div />}
+            </form>
+            <div className="overflow-auto">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead><tr className="text-left border-b border-slate-200 bg-slate-50"><th className="px-5 py-3">Cargo</th><th className="px-5 py-3 text-right">Diária</th><th className="px-5 py-3 text-right">Ações</th></tr></thead>
+                <tbody>
+                  {cargos.map((item) => <tr key={item.id} className="border-b border-slate-100"><td className="px-5 py-3 font-semibold text-slate-900">{item.cargo}</td><td className="px-5 py-3 text-right">{formatCurrencyBR(item.diaria)}</td><td className="px-5 py-3"><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => { setCargoEditandoId(String(item.id)); setCargoForm({ cargo: item.cargo, diaria: item.diaria }); }}>Editar</Button><Button variant="danger" onClick={() => handleExcluirCargo(item.id)}>Excluir</Button></div></td></tr>)}
+                  {!cargos.length ? <tr><td colSpan={3} className="px-5 py-8 text-center text-slate-500">Nenhum cargo cadastrado.</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
 export default function App() {
   const [data, setData] = useState(() => {
     const stored = normalizeStoredAppData(getStoredAppData());
@@ -2817,6 +3823,9 @@ export default function App() {
   const [editingStockId, setEditingStockId] = useState("");
   const [stockPickerModal, setStockPickerModal] = useState({ open: false, mode: "view" });
   const [stockPickerItemId, setStockPickerItemId] = useState("");
+  const [stockPickerQuery, setStockPickerQuery] = useState("");
+  const [stockNewCategory, setStockNewCategory] = useState("");
+  const [stockCodeFeedback, setStockCodeFeedback] = useState("");
   const [maintenanceForm, setMaintenanceForm] = useState(createEmptyMaintenanceForm());
   const [editingMaintenanceId, setEditingMaintenanceId] = useState("");
   const [selectedMaintenanceDetails, setSelectedMaintenanceDetails] = useState(null);
@@ -2831,12 +3840,13 @@ export default function App() {
   const obraAtual = useMemo(() => data.obras.find((obra) => sameId(obra.id, obraId)) || null, [data.obras, obraId]);
 
   const filteredData = useMemo(() => {
-    if (!obraAtual) return { companies: data.companies, roles: data.roles, maintenanceRoles: data.maintenanceRoles || [], stock: [], maintenance: [], attendance: [], history: [] };
+    if (!obraAtual) return { companies: data.companies, roles: data.roles, maintenanceRoles: data.maintenanceRoles || [], stock: [], stockMovements: [], maintenance: [], attendance: [], history: [] };
     return {
       companies: data.companies.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
       roles: data.roles.filter((item) => !item.obraId || sameId(item.obraId, obraAtual.id)),
       maintenanceRoles: data.maintenanceRoles || [],
       stock: data.stock.filter((item) => sameId(item.obraId, obraAtual.id)),
+      stockMovements: data.stockMovements.filter((item) => sameId(item.obraId, obraAtual.id)),
       maintenance: data.maintenance.filter((item) => sameId(item.obraId, obraAtual.id)).map((item) => calculateMaintenanceItem(item)),
       attendance: data.attendance.filter((item) => sameId(item.obraId, obraAtual.id)),
       history: data.history.filter((item) => sameId(item.obraId, obraAtual.id)),
@@ -2908,14 +3918,49 @@ export default function App() {
     setAttendanceCompanyTargetId("");
   }
 
+  const stockCatalogEntries = useMemo(() => {
+    return Array.from(new Map([
+      ...STOCK_CODE_CATALOG,
+      ...(data.stockCodeCatalog || []),
+    ].map((entry) => {
+      const code = String(entry?.code || "").trim().toUpperCase();
+      const description = String(entry?.description || "").trim();
+      const category = String(entry?.category || "").trim() || "Material";
+      return [code || `${description}::${category}`, { code, description, category }];
+    })).values()).filter((entry) => entry.code || entry.description);
+  }, [data.stockCodeCatalog]);
+
   const stockCatalogOptions = useMemo(() => {
-    return STOCK_CODE_CATALOG.map((entry) => `${entry.code} - ${entry.description}`);
-  }, []);
+    return stockCatalogEntries.map((entry) => `${entry.code} - ${entry.description}`);
+  }, [stockCatalogEntries]);
 
   const stockUnitOptions = useMemo(() => STOCK_UNIT_OPTIONS, []);
 
+  const stockCategoryOptions = useMemo(() => {
+    return Array.from(new Set([
+      "Material",
+      ...(data.stockCategories || []),
+      ...stockCatalogEntries.map((entry) => entry.category),
+      ...(data.stock || []).map((item) => item.category),
+    ].map((item) => String(item || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [data.stockCategories, data.stock, stockCatalogEntries]);
+
+  const stockPickerResults = useMemo(() => {
+    const normalized = String(stockPickerQuery || "").trim().toLowerCase();
+    const source = filteredData.stock || [];
+    if (!normalized) return source;
+    return source.filter((item) => {
+      const parsed = parseStockItemLabel(item.item);
+      return [parsed.code, parsed.description, item.category, item.invoice]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized);
+    });
+  }, [filteredData.stock, stockPickerQuery]);
+
   function openStockPickerModal(mode = "view") {
     setStockPickerItemId("");
+    setStockPickerQuery("");
     setStockPickerModal({ open: true, mode });
   }
 
@@ -3050,12 +4095,16 @@ export default function App() {
         })),
         attendance: (attendanceRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, roleId: row.role_id, qty: row.qty })),
         history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
+        stockCategories: [],
+        stockCodeCatalog: [],
       };
 
       const localBackup = normalizeStoredAppData(getStoredAppData());
       const localMaintenanceById = new Map((localBackup?.maintenance || []).map((item) => [String(item.id), item]));
       const mergedData = {
         ...nextData,
+        stockCategories: localBackup?.stockCategories || initialData.stockCategories || ["Material"],
+        stockCodeCatalog: localBackup?.stockCodeCatalog || initialData.stockCodeCatalog || [],
         maintenanceRoles: nextData.maintenanceRoles.length ? nextData.maintenanceRoles : (localBackup?.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles)),
         maintenance: nextData.maintenance.map((item) => calculateMaintenanceItem({ ...(localMaintenanceById.get(String(item.id)) || {}), ...item })),
       };
@@ -3545,12 +4594,16 @@ export default function App() {
       }));
     }
 
+    const updatedItem = { ...currentItem, quantity: nextQty };
+    if (selectedStockItem && sameId(selectedStockItem.id, currentItem.id)) {
+      setSelectedStockItem(updatedItem);
+    }
     setStockMovementModal(false);
     setStockMovementForm({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
   }
 
   async function addStockItem() {
-    const entry = getStockCatalogEntry(stockForm.code);
+    const entry = getStockCatalogEntry(stockForm.code, stockCatalogEntries);
     const finalCode = entry?.code || String(stockForm.code || "").trim().toUpperCase();
     const finalDescription = String(stockForm.item || "").trim() || entry?.description || "";
     const finalCategory = String(stockForm.category || "").trim() || entry?.category || "Material";
@@ -3600,15 +4653,125 @@ export default function App() {
         commitDataUpdate((prev) => ({
           ...prev,
           stock: prev.stock.map((item) => sameId(item.id, editingStockId) ? payload : item),
+          stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
         }));
       } else {
-        setData((prev) => ({ ...prev, stock: [...prev.stock, payload] }));
+        commitDataUpdate((prev) => ({
+          ...prev,
+          stock: [...prev.stock, payload],
+          stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
+        }));
       }
     }
+    if (finalCategory) {
+      commitDataUpdate((prev) => ({
+        ...prev,
+        stockCategories: Array.from(new Set([...(prev.stockCategories || []), finalCategory])).filter(Boolean),
+      }));
+    }
+
     setStockModal(false);
     setStockEditModal(false);
     setEditingStockId("");
     setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 });
+  }
+
+
+  function addStockCategory() {
+    const normalized = String(stockNewCategory || "").trim();
+    if (!normalized) {
+      setErrorMessage("Digite o nome da categoria para incluir.");
+      return;
+    }
+    commitDataUpdate((prev) => ({
+      ...prev,
+      stockCategories: Array.from(new Set([...(prev.stockCategories || []), normalized])).filter(Boolean),
+    }));
+    setStockForm((prev) => ({ ...prev, category: normalized }));
+    setStockNewCategory("");
+  }
+
+  function deleteStockCategory(categoryName) {
+    const normalized = String(categoryName || "").trim();
+    if (!normalized || normalized === "Material") {
+      setErrorMessage("A categoria Material é padrão do sistema e não pode ser excluída.");
+      return;
+    }
+    const inUse = (data.stock || []).some((item) => String(item.category || "").trim() === normalized);
+    if (inUse) {
+      setErrorMessage("Essa categoria está em uso por um material cadastrado.");
+      return;
+    }
+    commitDataUpdate((prev) => ({
+      ...prev,
+      stockCategories: (prev.stockCategories || []).filter((item) => String(item || "").trim() !== normalized),
+    }));
+    if (String(stockForm.category || "").trim() === normalized) {
+      setStockForm((prev) => ({ ...prev, category: "Material" }));
+    }
+  }
+
+
+  function addStockCode() {
+    const normalizedCode = String(stockForm.code || "").trim().toUpperCase();
+    const normalizedDescription = String(stockForm.item || "").trim();
+    const normalizedCategory = String(stockForm.category || "").trim() || "Material";
+    if (!normalizedCode) {
+      setStockCodeFeedback("Informe um código para incluir.");
+      setTimeout(() => setStockCodeFeedback(""), 3000);
+      return;
+    }
+    if (!normalizedDescription) {
+      setStockCodeFeedback("Informe o material/descrição para salvar esse código no catálogo.");
+      setTimeout(() => setStockCodeFeedback(""), 3000);
+      return;
+    }
+    commitDataUpdate((prev) => ({
+      ...prev,
+      stockCodeCatalog: Array.from(new Map([
+        ...(prev.stockCodeCatalog || []),
+        { code: normalizedCode, description: normalizedDescription, category: normalizedCategory },
+      ].map((entry) => [String(entry.code || "").trim().toUpperCase(), {
+        code: String(entry.code || "").trim().toUpperCase(),
+        description: String(entry.description || "").trim(),
+        category: String(entry.category || "").trim() || "Material",
+      }])).values()),
+      stockCategories: Array.from(new Set([...(prev.stockCategories || []), normalizedCategory])).filter(Boolean),
+    }));
+    setStockForm((prev) => ({ ...prev, code: normalizedCode, item: normalizedDescription, category: normalizedCategory }));
+    setStockCodeFeedback("");
+  }
+
+  function deleteStockCode(codeValue) {
+    const normalizedCode = String(codeValue || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      document.getElementById("stock-code-input")?.focus();
+      setStockCodeFeedback("Informe um código para excluir.");
+      setTimeout(() => setStockCodeFeedback(""), 3000);
+      return;
+    }
+    const isDefaultCatalogCode = STOCK_CODE_CATALOG.some((entry) => String(entry.code || "").trim().toUpperCase() === normalizedCode);
+    if (isDefaultCatalogCode) {
+      setStockCodeFeedback("Esse código faz parte do catálogo padrão do sistema e não pode ser excluído.");
+      setTimeout(() => setStockCodeFeedback(""), 3000);
+      return;
+    }
+    const inUse = (data.stock || []).some((item) => String(parseStockItemLabel(item.item).code || "").trim().toUpperCase() === normalizedCode);
+    if (inUse) {
+      setStockCodeFeedback("Esse código está em uso por um material cadastrado.");
+      setTimeout(() => setStockCodeFeedback(""), 3000);
+      return;
+    }
+    const confirmed = window.confirm(`Deseja realmente excluir o código ${normalizedCode}?`);
+    if (!confirmed) return;
+    commitDataUpdate((prev) => ({
+      ...prev,
+      stockCodeCatalog: (prev.stockCodeCatalog || []).filter((entry) => String(entry.code || "").trim().toUpperCase() !== normalizedCode),
+    }));
+    if (String(stockForm.code || "").trim().toUpperCase() === normalizedCode) {
+      setStockForm((prev) => ({ ...prev, code: "" }));
+    }
+    setStockCodeFeedback("");
   }
 
   function closeMaintenanceModal() {
@@ -3899,10 +5062,11 @@ export default function App() {
             ) : (
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
-                  {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToHistory={() => setCurrentPage("history")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual)} />}
+                  {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "Material", invoice: "", price: 0 }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
+                  {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                 </motion.div>
               </AnimatePresence>
@@ -4098,32 +5262,53 @@ export default function App() {
         </div>
       </Modal>
 
-      <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); }}>
+      <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); setStockCodeFeedback(""); }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Código do catálogo">
-            <div className="space-y-2">
-              <Input
-                list="stock-code-catalog"
-                placeholder="Digite ou selecione um código"
-                value={stockForm.code}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const entry = getStockCatalogEntry(raw);
-                  setStockForm((prev) => ({
-                    ...prev,
-                    code: entry ? entry.code : raw.toUpperCase(),
-                    item: entry ? entry.description : prev.item,
-                    category: entry ? entry.category : prev.category,
-                  }));
-                }}
-              />
-              <datalist id="stock-code-catalog">
-                {stockCatalogOptions.map((option) => <option key={option} value={option} />)}
-              </datalist>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Input
+                  id="stock-code-input"
+                  list="stock-code-catalog"
+                  placeholder="Digite ou selecione um código"
+                  value={stockForm.code}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const entry = getStockCatalogEntry(raw, stockCatalogEntries);
+                    setStockForm((prev) => ({
+                      ...prev,
+                      code: entry ? entry.code : raw.toUpperCase(),
+                      item: entry ? entry.description : prev.item,
+                      category: entry ? entry.category : prev.category,
+                    }));
+                  }}
+                />
+                <datalist id="stock-code-catalog">
+                  {stockCatalogOptions.map((option) => <option key={option} value={option} />)}
+                </datalist>
+                {stockCodeFeedback && (
+                  <p className="text-sm text-rose-600">{stockCodeFeedback}</p>
+                )}
+              </div>
+              <div className="flex flex-col md:flex-row gap-2">
+                <Button type="button" variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={addStockCode}>Incluir código</Button>
+                <Button type="button" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" onClick={() => deleteStockCode(stockForm.code)}>Excluir código</Button>
+              </div>
             </div>
           </Field>
           <Field label="Material"><Input value={stockForm.item} onChange={(e) => setStockForm((prev) => ({ ...prev, item: e.target.value }))} /></Field>
-          <Field label="Categoria"><Input value={stockForm.category} onChange={(e) => setStockForm((prev) => ({ ...prev, category: e.target.value }))} /></Field>
+          <Field label="Categoria">
+            <div className="space-y-3">
+              <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={stockForm.category} onChange={(e) => setStockForm((prev) => ({ ...prev, category: e.target.value }))}>
+                {stockCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <div className="flex flex-col md:flex-row gap-2">
+                <Input placeholder="Nova categoria" value={stockNewCategory} onChange={(e) => setStockNewCategory(e.target.value)} />
+                <Button type="button" variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={addStockCategory}>Incluir categoria</Button>
+                <Button type="button" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" onClick={() => deleteStockCategory(stockForm.category)}>Excluir categoria</Button>
+              </div>
+            </div>
+          </Field>
           <Field label="Unidade"><select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={stockForm.unit} onChange={(e) => setStockForm((prev) => ({ ...prev, unit: e.target.value }))}>{stockUnitOptions.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></Field>
           <Field label="Saldo"><Input type="number" value={stockForm.quantity} onChange={(e) => setStockForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
           <Field label="Mínimo"><Input type="number" value={stockForm.min} onChange={(e) => setStockForm((prev) => ({ ...prev, min: e.target.value }))} /></Field>
@@ -4133,7 +5318,7 @@ export default function App() {
         <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
           Use o catálogo de códigos da planilha para padronizar os materiais. O sistema salva o item como <strong>código + descrição</strong>.
         </div>
-        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); }}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
+        <div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); setStockCodeFeedback(""); }}>Cancelar</Button><Button onClick={addStockItem} disabled={!stockForm.item || !obraAtual}>Salvar</Button></div>
       </Modal>
 
 
@@ -4141,23 +5326,41 @@ export default function App() {
       <Modal open={stockPickerModal.open} title={stockPickerModal.mode === "edit" ? "Selecionar material para editar" : "Selecionar material para consulta"} onClose={() => setStockPickerModal({ open: false, mode: "view" })}>
         <div className="space-y-4">
           <Field label="Material">
-            <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50" value={stockPickerItemId} onChange={(e) => setStockPickerItemId(e.target.value)}>
-              <option value="">Selecione um material</option>
-              {(data.stock || []).map((item) => {
-                const parsed = parseStockItemLabel(item.item);
-                return <option key={item.id} value={item.id}>{parsed.code ? `${parsed.code} - ` : ""}{parsed.description || item.item}</option>;
-              })}
-            </select>
+            <div className="space-y-3">
+              <Input placeholder="Digite código, descrição, categoria ou NF" value={stockPickerQuery} onChange={(e) => setStockPickerQuery(e.target.value)} />
+              <div className="max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-2 space-y-2">
+                {stockPickerResults.length ? stockPickerResults.map((item) => {
+                  const parsed = parseStockItemLabel(item.item);
+                  const active = sameId(item.id, stockPickerItemId);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${active ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"}`}
+                      onClick={() => setStockPickerItemId(item.id)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{parsed.code ? `${parsed.code} - ` : ""}{parsed.description || item.item}</p>
+                          <p className="text-sm text-slate-500">{item.category || "Material"} • Saldo {formatNumberBR(item.quantity, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {item.unit}</p>
+                        </div>
+                        {active ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Selecionado</Badge> : null}
+                      </div>
+                    </button>
+                  );
+                }) : <p className="px-2 py-3 text-sm text-slate-500">Nenhum material encontrado para o filtro digitado.</p>}
+              </div>
+            </div>
           </Field>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
-            Use este atalho para abrir rapidamente a consulta ou a edição do material, sem precisar localizar o card na lista.
+            Agora você pode digitar qualquer material, código, categoria ou NF para localizar mais rápido na consulta e na edição.
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setStockPickerModal({ open: false, mode: "view" })}>Cancelar</Button>
             <Button
               disabled={!stockPickerItemId}
               onClick={() => {
-                const target = (data.stock || []).find((item) => sameId(item.id, stockPickerItemId));
+                const target = (filteredData.stock || []).find((item) => sameId(item.id, stockPickerItemId));
                 setStockPickerModal({ open: false, mode: "view" });
                 if (!target) return;
                 if (stockPickerModal.mode === "edit") {
