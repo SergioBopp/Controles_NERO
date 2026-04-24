@@ -60,6 +60,7 @@ const initialData = {
   stockCodeCatalog: [],
   stockResponsibles: [],
   attendance: [],
+  attendanceDays: [],
   history: [],
 };
 
@@ -2825,7 +2826,16 @@ function AttendancePage({
   onEditCompanySelector,
   onOpenNewRoleForCompany,
   onOpenNewAttendanceForRole,
+  attendanceDayStatus = "not_started",
+  attendanceDayDate = getTodayISO(),
+  attendanceDayClosedAt = "",
+  onStartAttendanceDay,
+  onCloseAttendanceDay,
 }) {
+  const dayCanEdit = attendanceDayStatus === "open";
+  const dayClosed = attendanceDayStatus === "closed";
+  const dayNotStarted = attendanceDayStatus === "not_started";
+
   const grouped = useMemo(() => {
     return companies.map((company) => {
       const companyRoles = roles.filter((role) => role.companyId === company.id);
@@ -2854,15 +2864,37 @@ function AttendancePage({
   const totalPresent = grouped.reduce((acc, company) => acc + company.total, 0);
   const hasCompanies = grouped.length > 0;
 
+  const statusBadge = dayClosed
+    ? <Badge className="bg-rose-100 text-rose-800 border-rose-200 px-4 py-2 text-base rounded-2xl">Dia fechado</Badge>
+    : dayCanEdit
+      ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 px-4 py-2 text-base rounded-2xl">Dia aberto</Badge>
+      : <Badge className="bg-amber-100 text-amber-800 border-amber-200 px-4 py-2 text-base rounded-2xl">Aguardando início</Badge>;
+
   return (
     <div className="space-y-5">
       <Card className="overflow-hidden">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 p-5 md:p-7">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Presença</h2>
-            <p className="text-base text-slate-500 mt-1.5">Controle por empresa e cargo/função no modelo da planilha</p>
+            <p className="text-base text-slate-500 mt-1.5">Controle diário por empresa e cargo/função, com abertura, fechamento e histórico por data</p>
           </div>
           <div className="flex flex-wrap gap-3 xl:justify-end">
+            <Button
+              className="border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              variant="outline"
+              onClick={onStartAttendanceDay}
+              disabled={dayCanEdit && totalPresent === 0}
+            >
+              Iniciar dia
+            </Button>
+            <Button
+              className="border-amber-300 text-amber-800 hover:bg-amber-50"
+              variant="outline"
+              onClick={onCloseAttendanceDay}
+              disabled={!dayCanEdit}
+            >
+              Fechar dia
+            </Button>
             <Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAddCompany}>
               Nova empresa
             </Button>
@@ -2883,7 +2915,7 @@ function AttendancePage({
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 md:p-7">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 p-5 md:p-7">
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-[22px] bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-[0_10px_24px_rgba(16,185,129,0.12)]">
               <Users className="h-8 w-8" />
@@ -2893,10 +2925,28 @@ function AttendancePage({
               <p className="text-5xl leading-none font-extrabold text-slate-900 mt-2">{totalPresent}</p>
             </div>
           </div>
-          <Badge className="bg-white text-slate-700 border-slate-300 px-4 py-2 text-base rounded-2xl">
-            Data base: {getTodayBR()}
-          </Badge>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {statusBadge}
+            <Badge className="bg-white text-slate-700 border-slate-300 px-4 py-2 text-base rounded-2xl">
+              Data base: {formatDateBR(attendanceDayDate || getTodayISO())}
+            </Badge>
+            {dayClosed && attendanceDayClosedAt ? (
+              <Badge className="bg-white text-slate-700 border-slate-300 px-4 py-2 text-base rounded-2xl">
+                Fechado em: {new Date(attendanceDayClosedAt).toLocaleString("pt-BR")}
+              </Badge>
+            ) : null}
+          </div>
         </div>
+        {dayNotStarted ? (
+          <div className="border-t border-amber-100 bg-amber-50 px-5 md:px-7 py-4 text-sm text-amber-900">
+            Inicie o dia para liberar os lançamentos de presença. Ao iniciar, a presença atual será zerada para um novo ciclo.
+          </div>
+        ) : null}
+        {dayClosed ? (
+          <div className="border-t border-rose-100 bg-rose-50 px-5 md:px-7 py-4 text-sm text-rose-900">
+            Este dia está fechado. As presenças ficam travadas para preservar o histórico. Use “Iniciar dia” para começar um novo dia zerado.
+          </div>
+        ) : null}
       </Card>
 
       <div className="space-y-5">
@@ -2941,6 +2991,7 @@ function AttendancePage({
                             <Button
                               variant="outline"
                               className="h-10 px-3 border-slate-300 text-slate-700 hover:bg-slate-50"
+                              disabled={!dayCanEdit}
                               onClick={() => onOpenNewAttendanceForRole({
                                 companyId: row.companyId,
                                 roleId: row.roleId,
@@ -2952,6 +3003,7 @@ function AttendancePage({
                             <Button
                               variant="outline"
                               className="h-10 px-3 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                              disabled={!dayCanEdit || !row.latestAttendanceId}
                               onClick={() => onEditAttendance({
                                 id: row.latestAttendanceId,
                                 companyId: row.companyId,
@@ -2983,6 +3035,7 @@ function AttendancePage({
                               <Button
                                 variant="danger"
                                 className="h-10 px-3"
+                                disabled={!dayCanEdit}
                                 onClick={() => onDeletePresence(row.latestAttendanceId)}
                               >
                                 Excluir presença
@@ -3013,7 +3066,6 @@ function AttendancePage({
     </div>
   );
 }
-
 
 async function buildPdfHeader(doc, title, obraNome, date, generatedAt) {
   const marginLeft = 30;
@@ -4714,6 +4766,38 @@ export default function App() {
     ].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" }));
   }, [data.stockResponsibles, filteredData.stockMovements]);
 
+  const currentAttendanceDay = useMemo(() => {
+    if (!obraAtual) return { status: "not_started", date: getTodayISO(), closedAt: "" };
+    const found = (data.attendanceDays || []).find((day) => sameId(day.obraId, obraAtual.id));
+    if (found) return found;
+    return {
+      obraId: obraAtual.id,
+      date: getTodayISO(),
+      status: (filteredData.attendance || []).length ? "open" : "not_started",
+      closedAt: "",
+    };
+  }, [data.attendanceDays, obraAtual, filteredData.attendance]);
+
+  const attendanceDayCanEdit = currentAttendanceDay?.status === "open";
+
+  function upsertAttendanceDayStatus(status, extra = {}) {
+    if (!obraAtual) return;
+    const payload = {
+      obraId: obraAtual.id,
+      date: extra.date || getTodayISO(),
+      status,
+      closedAt: extra.closedAt || "",
+    };
+
+    commitDataUpdate((prev) => {
+      const withoutCurrent = (prev.attendanceDays || []).filter((day) => !sameId(day.obraId, obraAtual.id));
+      return {
+        ...prev,
+        attendanceDays: [...withoutCurrent, payload],
+      };
+    });
+  }
+
   const maintenancePreview = useMemo(() => calculateMaintenanceItem(maintenanceForm), [maintenanceForm]);
 
   const selectedAttendanceRoles = useMemo(() => {
@@ -4736,6 +4820,10 @@ export default function App() {
   }
 
   function openAttendanceEdit(record) {
+    if (!attendanceDayCanEdit) {
+      setErrorMessage("Inicie o dia de presença antes de editar presenças.");
+      return;
+    }
     if (!record) return;
     setAttendanceEditRecord(record);
     setAttendanceBatchCompanyId(String(record.companyId));
@@ -4744,6 +4832,10 @@ export default function App() {
   }
 
   function openAttendanceCreateForRole(record) {
+    if (!attendanceDayCanEdit) {
+      setErrorMessage("Inicie o dia de presença antes de lançar presenças.");
+      return;
+    }
     if (!record) return;
     setAttendanceEditRecord(null);
     setAttendanceBatchCompanyId(String(record.companyId));
@@ -5013,6 +5105,7 @@ export default function App() {
         stockCategories: localBackup?.stockCategories || initialData.stockCategories || ["Material"],
         stockCodeCatalog: localBackup?.stockCodeCatalog || initialData.stockCodeCatalog || [],
         stockResponsibles: localBackup?.stockResponsibles || initialData.stockResponsibles || [],
+        attendanceDays: localBackup?.attendanceDays || initialData.attendanceDays || [],
         maintenanceRoles: nextData.maintenanceRoles.length ? nextData.maintenanceRoles : (localBackup?.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles)),
         maintenance: nextData.maintenance.map((item) => calculateMaintenanceItem({ ...(localMaintenanceById.get(String(item.id)) || {}), ...item })),
       };
@@ -5362,7 +5455,99 @@ export default function App() {
     });
   }
 
+  async function startAttendanceDay() {
+    if (!obraAtual) return;
+
+    const hasAttendance = (filteredData.attendance || []).length > 0;
+    const message = hasAttendance
+      ? "Iniciar um novo dia?\\n\\nIsso vai zerar as presenças atuais da obra para começar um novo ciclo. Certifique-se de que o dia anterior já foi fechado."
+      : "Iniciar o dia de presença para esta obra?";
+
+    if (!window.confirm(message)) return;
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase
+        .from("attendance_records")
+        .delete()
+        .eq("obra_id", obraAtual.id);
+
+      if (error) return setErrorMessage(error.message);
+    }
+
+    commitDataUpdate((prev) => {
+      const withoutAttendance = (prev.attendance || []).filter((item) => !sameId(item.obraId, obraAtual.id));
+      const withoutDay = (prev.attendanceDays || []).filter((day) => !sameId(day.obraId, obraAtual.id));
+      return {
+        ...prev,
+        attendance: withoutAttendance,
+        attendanceDays: [
+          ...withoutDay,
+          { obraId: obraAtual.id, date: getTodayISO(), status: "open", closedAt: "" },
+        ],
+      };
+    });
+  }
+
+  async function closeAttendanceDay() {
+    if (!obraAtual) return;
+    if (currentAttendanceDay?.status === "closed") return;
+
+    const confirmar = window.confirm(
+      "Fechar o dia de presença?\\n\\nAs presenças atuais serão salvas no histórico e ficarão travadas. Para lançar outro dia, use Iniciar dia."
+    );
+    if (!confirmar) return;
+
+    const snapshot = {
+      id: generateId(),
+      obraId: obraAtual.id,
+      date: currentAttendanceDay?.date || getTodayISO(),
+      createdAt: new Date().toISOString(),
+      obraName: obraAtual.nome,
+      stock: filteredData.stock,
+      maintenance: filteredData.maintenance,
+      attendance: filteredData.attendance,
+    };
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase.from("history_snapshots").insert({
+        id: snapshot.id,
+        obra_id: snapshot.obraId,
+        date: snapshot.date,
+        obra_nome: snapshot.obraName,
+        snapshot: {
+          stock: snapshot.stock,
+          maintenance: snapshot.maintenance,
+          attendance: snapshot.attendance,
+        },
+      });
+      if (error) return setErrorMessage(error.message);
+    }
+
+    commitDataUpdate((prev) => {
+      const withoutDay = (prev.attendanceDays || []).filter((day) => !sameId(day.obraId, obraAtual.id));
+      const localHistory = onlineMode && isSupabaseConfigured ? (prev.history || []) : [snapshot, ...(prev.history || [])];
+      return {
+        ...prev,
+        history: localHistory,
+        attendanceDays: [
+          ...withoutDay,
+          {
+            obraId: obraAtual.id,
+            date: snapshot.date,
+            status: "closed",
+            closedAt: snapshot.createdAt,
+          },
+        ],
+      };
+    });
+  }
+
   async function addAttendanceRecord() {
+    if (!attendanceDayCanEdit) {
+      setErrorMessage("Inicie o dia de presença antes de lançar ou editar presenças.");
+      return;
+    }
+
     const companyId = Number(attendanceBatchCompanyId);
     const validRoles = filteredData.roles.filter((role) => role.companyId === companyId);
 
@@ -5922,6 +6107,11 @@ export default function App() {
   }
 
   async function deleteAttendanceRecord(id) {
+    if (!attendanceDayCanEdit) {
+      setErrorMessage("O dia de presença está fechado ou ainda não foi iniciado.");
+      return;
+    }
+
     if (onlineMode && isSupabaseConfigured) {
       const { error } = await supabase.from("attendance_records").delete().eq("id", id);
       if (error) return setErrorMessage(error.message);
@@ -6082,7 +6272,7 @@ export default function App() {
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
-                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} />}
+                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "planejamento-dashboard" && (
