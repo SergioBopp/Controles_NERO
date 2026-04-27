@@ -1,0 +1,2469 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --nero-green: #066342;
+  --nero-green-dark: #04492f;
+  --nero-accent: #22c55e;
+  --bg: #f3f6fb;
+  --card: #ffffff;
+  --text: #071126;
+  --muted: #64748b;
+  --border: #e3eaf2;
+  --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* LAYOUT */
+.app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 300px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.24), transparent 34%),
+    linear-gradient(180deg, var(--nero-green), var(--nero-green-dark));
+  color: #ffffff;
+  padding: 34px 30px;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 18px 0 45px rgba(4, 73, 47, 0.16);
+}
+
+.logo {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 18px;
+  margin-bottom: 54px;
+}
+
+.logo-img {
+  width: 76px;
+  height: 76px;
+  border-radius: 20px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 3px;
+  transform: translateX(-2px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+}
+
+.logo-top {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.logo h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 0.92;
+  letter-spacing: -0.8px;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.logo-sub {
+  display: block;
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+/* MENU */
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sidebar nav button {
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+  padding: 18px 20px;
+  text-align: left;
+  font-weight: 900;
+  font-size: 15px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.sidebar nav button.active,
+.sidebar nav button:hover {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 18px 34px rgba(34, 197, 94, 0.26);
+  transform: translateY(-1px);
+}
+
+.sidebar footer {
+  position: absolute;
+  bottom: 26px;
+  left: 30px;
+  right: 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 18px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar footer span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: var(--nero-accent);
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.sidebar footer i {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.35);
+  margin: 0 14px -5px;
+}
+
+/* HEADER */
+.header {
+  min-height: 104px;
+  background: rgba(255, 255, 255, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 48px;
+  border-bottom: 1px solid var(--border);
+  gap: 24px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #8190aa;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 950;
+  color: var(--text);
+  letter-spacing: -1px;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status,
+.btn {
+  border: 1px solid #d8e2ef;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 13px 18px;
+  font-weight: 900;
+  color: #334155;
+}
+
+.status {
+  background: #dcfce7;
+  color: #065f46;
+  border-color: #bbf7d0;
+}
+
+.btn {
+  cursor: pointer;
+  transition: 0.2s ease;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/* CONTENT */
+.content {
+  padding: 40px 48px;
+}
+
+.alert {
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #065f46;
+  font-weight: 900;
+}
+
+/* KPI */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 28px;
+  margin-bottom: 30px;
+}
+
+.card,
+.painel,
+.page-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.card {
+  padding: 26px;
+  min-height: 142px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  position: relative;
+}
+
+.card::after,
+.painel::after,
+.page-card::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.card::after {
+  right: -30px;
+  top: -34px;
+  width: 98px;
+  height: 98px;
+}
+
+.card h4 {
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #73839c;
+  font-size: 11px;
+  font-weight: 950;
+  margin: 0 0 8px;
+}
+
+.card small {
+  color: #9aa7bb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.card p {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 950;
+  color: var(--text);
+}
+
+/* PAINEL PRINCIPAL */
+.painel,
+.page-card {
+  padding: 32px 54px;
+  margin-bottom: 20px;
+  text-align: left;
+  overflow: hidden;
+  position: relative;
+}
+
+.painel::after,
+.page-card::after {
+  right: -74px;
+  bottom: -94px;
+  width: 220px;
+  height: 220px;
+}
+
+.painel-title {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 5px;
+  color: #73839c;
+  font-size: 12px;
+  font-weight: 950;
+  margin-bottom: 18px;
+}
+
+.painel h2,
+.page-card h2 {
+  margin: 0 0 12px;
+  font-size: 34px;
+  font-weight: 950;
+  color: var(--text);
+  letter-spacing: -0.8px;
+}
+
+.painel p,
+.page-card p {
+  color: var(--muted);
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
+  max-width: 760px;
+}
+
+/* MINI CARDS */
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.quick-grid div {
+  padding: 16px 18px;
+  border: 1px solid #e4edf7;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.quick-grid strong,
+.quick-grid span {
+  display: block;
+}
+
+.quick-grid strong {
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.quick-grid span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* FORMS */
+.form-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.form-grid input,
+.form-grid select {
+  border: 1px solid #d8e2ef;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.btn-primary {
+  border: 0;
+  border-radius: 14px;
+  padding: 13px 18px;
+  background: var(--nero-accent);
+  color: #ffffff;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 16px 28px rgba(34, 197, 94, 0.22);
+}
+
+/* TABLES */
+.table-wrap {
+  position: relative;
+  z-index: 1;
+  margin-top: 26px;
+  overflow: auto;
+  border: 1px solid #e4edf7;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+th,
+td {
+  padding: 15px 16px;
+  text-align: left;
+  border-bottom: 1px solid #edf2f7;
+  font-size: 14px;
+}
+
+th {
+  color: #73839c;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+td {
+  color: #263247;
+  font-weight: 800;
+}
+
+/* BADGES */
+.badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.badge.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* RESPONSIVO */
+@media (max-width: 1100px) {
+  .cards,
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    position: static;
+  }
+
+  .logo {
+    grid-template-columns: 72px 1fr;
+    margin-bottom: 30px;
+  }
+
+  .sidebar footer {
+    position: static;
+    margin-top: 24px;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .sidebar {
+    padding: 26px 22px;
+  }
+
+  .logo {
+    grid-template-columns: 62px 1fr;
+    column-gap: 14px;
+  }
+
+  .logo-img {
+    width: 62px;
+    height: 62px;
+  }
+
+  .logo h2 {
+    font-size: 28px;
+  }
+
+  .logo-sub {
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  .cards,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content,
+  .header {
+    padding: 24px;
+  }
+
+  .painel,
+  .page-card {
+    padding: 28px 24px;
+  }
+}
+
+
+/* =========================
+   V1.7.4 — AJUSTES DEFINITIVOS DA BASE BOA
+========================= */
+
+/* Alinhamento da marca na sidebar */
+.logo {
+  grid-template-columns: 76px 1fr;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+}
+
+.logo h2 {
+  line-height: 1;
+  text-align: left;
+}
+
+.logo-sub {
+  margin-top: 4px;
+  line-height: 1;
+  text-align: left;
+}
+
+/* Card mais largo e sem sobra lateral exagerada */
+.content {
+  padding: 36px 32px;
+}
+
+.painel,
+.page-card {
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto 20px;
+  padding: 32px 40px;
+}
+
+/* Formulários e foco visual */
+.form-grid input,
+.form-grid select,
+.systems-toolbar select,
+.systems-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-grid input:focus,
+.form-grid select:focus,
+.systems-toolbar select:focus,
+.systems-form input:focus {
+  border-color: #9be7bd;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+}
+
+/* Tela Sistemas no padrão Obras */
+.systems-toolbar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.25fr) 240px;
+  gap: 14px;
+  margin-top: 26px;
+  max-width: 760px;
+}
+
+.systems-toolbar select {
+  border: 1px solid #d8e2ef;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.systems-form {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.25fr) 220px;
+  gap: 14px;
+  margin-top: 14px;
+  max-width: 740px;
+}
+
+.systems-form input {
+  border: 1px solid #d8e2ef;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.systems-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.system-card {
+  min-height: 108px;
+  padding: 18px;
+  border: 1px solid #e4edf7;
+  border-radius: 18px;
+  background: #fbfdff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: 0.2s ease;
+}
+
+.system-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.07);
+}
+
+.system-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.system-card span {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 12px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 18px;
+  border: 1px dashed #d8e2ef;
+  border-radius: 18px;
+  background: #fbfdff;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+/* Tabelas mais limpas */
+.table-wrap {
+  overflow: hidden;
+}
+
+table {
+  table-layout: fixed;
+  min-width: 0;
+}
+
+td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist-table th:nth-child(1),
+.checklist-table td:nth-child(1) {
+  width: 75%;
+}
+
+.checklist-table th:nth-child(2),
+.checklist-table td:nth-child(2) {
+  width: 25%;
+}
+
+@media (max-width: 1180px) {
+  .systems-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  table {
+    table-layout: auto;
+    min-width: 820px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 980px) {
+  .systems-toolbar,
+  .systems-form {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .systems-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   V1.8 — EXECUÇÃO DO CHECKLIST
+========================= */
+
+.checklist-table th:nth-child(1),
+.checklist-table td:nth-child(1) {
+  width: 28%;
+}
+
+.checklist-table th:nth-child(2),
+.checklist-table td:nth-child(2) {
+  width: 15%;
+}
+
+.checklist-table th:nth-child(3),
+.checklist-table td:nth-child(3) {
+  width: 32%;
+}
+
+.checklist-table th:nth-child(4),
+.checklist-table td:nth-child(4) {
+  width: 25%;
+}
+
+.badge.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.bad {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.evidence-input {
+  width: 100%;
+  border: 1px solid #d8e2ef;
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 750;
+}
+
+.evidence-input:focus {
+  border-color: #9be7bd;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+}
+
+.check-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mini-action {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.mini-action:hover {
+  transform: translateY(-1px);
+}
+
+.mini-action.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.mini-action.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.mini-action.bad {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.mini-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 1180px) {
+  .checklist-table table {
+    min-width: 1100px;
+  }
+}
+
+/* =========================
+   V2.0 — DASHBOARD EXECUTIVO
+========================= */
+
+.executive-panel {
+  margin-top: 24px;
+}
+
+.executive-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}
+
+.executive-score {
+  min-width: 150px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  text-align: center;
+}
+
+.executive-score strong {
+  display: block;
+  color: #065f46;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.executive-score span {
+  display: block;
+  margin-top: 6px;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+}
+
+.progress-main {
+  position: relative;
+  z-index: 1;
+  margin-top: 24px;
+}
+
+.progress-bar {
+  height: 16px;
+  border-radius: 999px;
+  background: #e9f3ee;
+  overflow: hidden;
+}
+
+.progress-bar div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.executive-table {
+  margin-top: 26px;
+}
+
+.executive-table th:nth-child(1),
+.executive-table td:nth-child(1) {
+  width: 24%;
+}
+
+.executive-table th:nth-child(2),
+.executive-table td:nth-child(2) {
+  width: 22%;
+}
+
+.executive-table th:nth-child(3),
+.executive-table td:nth-child(3),
+.executive-table th:nth-child(4),
+.executive-table td:nth-child(4),
+.executive-table th:nth-child(5),
+.executive-table td:nth-child(5) {
+  width: 10%;
+}
+
+.executive-table th:nth-child(6),
+.executive-table td:nth-child(6) {
+  width: 24%;
+}
+
+.mini-progress {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.mini-progress span {
+  font-weight: 950;
+  color: var(--text);
+}
+
+.mini-progress div {
+  height: 10px;
+  border-radius: 999px;
+  background: #e9f3ee;
+  overflow: hidden;
+}
+
+.mini-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.report-card {
+  max-width: 1480px;
+}
+
+.report-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.report-grid div {
+  padding: 18px;
+  border: 1px solid #e4edf7;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.report-grid strong {
+  display: block;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.report-grid span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.report-section {
+  position: relative;
+  z-index: 1;
+  margin-top: 30px;
+}
+
+.report-section h3 {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 950;
+}
+
+@media (max-width: 1180px) {
+  .report-grid {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+
+  .executive-head {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .sidebar,
+  .header,
+  .no-print {
+    display: none !important;
+  }
+
+  .app {
+    display: block;
+  }
+
+  .main {
+    width: 100%;
+  }
+
+  .content {
+    padding: 0;
+  }
+
+  .page-card,
+  .report-card {
+    box-shadow: none;
+    border: 0;
+    padding: 20px;
+    max-width: none;
+  }
+
+  .page-card::after,
+  .report-card::after {
+    display: none;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table {
+    min-width: 0;
+    table-layout: auto;
+  }
+}
+
+/* =========================
+   V2.1 — SIDEBAR APROVADA / DISCIPLINAS
+========================= */
+
+.logo {
+  grid-template-columns: 76px 1fr;
+  column-gap: 14px;
+}
+
+.logo-text {
+  transform: translateX(-4px) translateY(1px);
+}
+
+.logo h2,
+.logo-sub {
+  text-align: left;
+}
+
+.logo h2 {
+  line-height: 1;
+}
+
+.logo-sub {
+  margin-top: 4px;
+  line-height: 1;
+}
+
+/* =========================
+   V2.2 — PENDÊNCIAS + RELATÓRIO
+========================= */
+
+.pendencias-summary {
+  margin-top: 26px;
+  max-width: 900px;
+}
+
+.pendencias-table table {
+  min-width: 1180px;
+  table-layout: auto;
+}
+
+.pendencias-table th,
+.pendencias-table td {
+  white-space: nowrap;
+}
+
+.pendencias-table th:nth-child(4),
+.pendencias-table td:nth-child(4) {
+  min-width: 220px;
+  white-space: normal;
+}
+
+.report-card .pendencias-table {
+  margin-top: 16px;
+}
+
+@media print {
+  .pendencias-table table {
+    min-width: 0;
+    width: 100%;
+    font-size: 11px;
+  }
+
+  .pendencias-table th,
+  .pendencias-table td {
+    padding: 8px;
+    white-space: normal;
+  }
+}
+
+/* =========================
+   V2.3.1 — CHECKLIST PADRÃO POR DISCIPLINA
+========================= */
+
+.checklist-toolbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 24px;
+  margin-bottom: -4px;
+}
+
+.checklist-toolbar .btn-primary {
+  min-width: 230px;
+}
+
+
+/* =========================
+   V2.4.3 FULL — EVIDÊNCIAS BLINDADAS
+   Escopo isolado. Não altera layout global.
+========================= */
+
+.checklist-form-evidence {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.checklist-form-evidence .evidence-url-field {
+  grid-column: span 2;
+}
+
+.checklist-form-evidence .btn-primary {
+  min-height: 52px;
+}
+
+.evidence-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.evidence-box .evidence-input {
+  width: 100%;
+}
+
+.evidence-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.evidence-link:hover {
+  transform: translateY(-1px);
+}
+
+.report-link {
+  margin-top: 6px;
+}
+
+.report-grid {
+  grid-template-columns: repeat(6, minmax(155px, 1fr));
+}
+
+.report-grid div {
+  min-width: 155px;
+}
+
+@media (max-width: 1180px) {
+  .checklist-form-evidence {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .checklist-form-evidence .evidence-url-field {
+    grid-column: span 1;
+  }
+
+  .report-grid {
+    grid-template-columns: repeat(3, minmax(155px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .checklist-form-evidence,
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .evidence-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #000;
+    text-decoration: underline;
+  }
+}
+
+/* =========================
+   V2.4.4 — PENDÊNCIAS NÍVEL EXECUTIVO
+   Escopo isolado.
+========================= */
+
+.pendencias-card {
+  max-width: 1580px;
+}
+
+.pendencias-summary {
+  margin-top: 26px;
+  max-width: 980px;
+}
+
+.pendencias-summary .summary-tile {
+  text-align: left;
+  border: 1px solid #e4edf7;
+  border-radius: 18px;
+  background: #fbfdff;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.pendencias-summary .summary-tile:hover,
+.pendencias-summary .summary-tile.active {
+  transform: translateY(-1px);
+  border-color: #bbf7d0;
+  box-shadow: 0 14px 28px rgba(34, 197, 94, 0.12);
+}
+
+.pendencias-toolbar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 220px;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.pendencias-toolbar input,
+.pendencias-toolbar select {
+  width: 100%;
+  border: 1px solid #d8e2ef;
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.pendencias-toolbar input:focus,
+.pendencias-toolbar select:focus,
+.priority-select:focus,
+.responsavel-input:focus {
+  border-color: #9be7bd;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+}
+
+.executive-pendencias-table {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.executive-pendencias-table table {
+  min-width: 1320px;
+  table-layout: fixed;
+}
+
+.executive-pendencias-table th:nth-child(1),
+.executive-pendencias-table td:nth-child(1) {
+  width: 15%;
+}
+
+.executive-pendencias-table th:nth-child(2),
+.executive-pendencias-table td:nth-child(2) {
+  width: 12%;
+}
+
+.executive-pendencias-table th:nth-child(3),
+.executive-pendencias-table td:nth-child(3) {
+  width: 16%;
+}
+
+.executive-pendencias-table th:nth-child(4),
+.executive-pendencias-table td:nth-child(4) {
+  width: 22%;
+}
+
+.executive-pendencias-table th:nth-child(5),
+.executive-pendencias-table td:nth-child(5) {
+  width: 10%;
+}
+
+.executive-pendencias-table th:nth-child(6),
+.executive-pendencias-table td:nth-child(6) {
+  width: 13%;
+}
+
+.executive-pendencias-table th:nth-child(7),
+.executive-pendencias-table td:nth-child(7) {
+  width: 10%;
+}
+
+.executive-pendencias-table th:nth-child(8),
+.executive-pendencias-table td:nth-child(8) {
+  width: 22%;
+}
+
+.executive-pendencias-table .descricao-cell {
+  white-space: normal;
+  line-height: 1.45;
+}
+
+.priority-select {
+  width: 100%;
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  padding: 8px 10px;
+  outline: none;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.priority-select.alta {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.priority-select.media {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.priority-select.baixa {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.responsavel-input {
+  min-width: 0;
+}
+
+.pendencia-actions {
+  min-width: 260px;
+}
+
+@media (max-width: 900px) {
+  .pendencias-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .pendencias-toolbar,
+  .pendencia-actions {
+    display: none !important;
+  }
+
+  .executive-pendencias-table table {
+    min-width: 0;
+    width: 100%;
+    table-layout: auto;
+  }
+}
+
+/* =========================
+   V2.4.5 — PENDÊNCIAS ULTRA EXECUTIVO
+   Sem scroll horizontal em desktop.
+   Escopo isolado na tela Pendências.
+========================= */
+
+.pendencias-card {
+  max-width: 1680px;
+}
+
+/* A tabela agora se adapta ao card em desktop */
+.executive-pendencias-table {
+  overflow-x: visible;
+}
+
+.executive-pendencias-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+/* Distribuição inteligente das colunas */
+.executive-pendencias-table th:nth-child(1),
+.executive-pendencias-table td:nth-child(1) {
+  width: 14%;
+}
+
+.executive-pendencias-table th:nth-child(2),
+.executive-pendencias-table td:nth-child(2) {
+  width: 10%;
+}
+
+.executive-pendencias-table th:nth-child(3),
+.executive-pendencias-table td:nth-child(3) {
+  width: 16%;
+}
+
+.executive-pendencias-table th:nth-child(4),
+.executive-pendencias-table td:nth-child(4) {
+  width: 20%;
+}
+
+.executive-pendencias-table th:nth-child(5),
+.executive-pendencias-table td:nth-child(5) {
+  width: 9%;
+}
+
+.executive-pendencias-table th:nth-child(6),
+.executive-pendencias-table td:nth-child(6) {
+  width: 12%;
+}
+
+.executive-pendencias-table th:nth-child(7),
+.executive-pendencias-table td:nth-child(7) {
+  width: 9%;
+}
+
+.executive-pendencias-table th:nth-child(8),
+.executive-pendencias-table td:nth-child(8) {
+  width: 10%;
+}
+
+/* Texto profissional: corta só onde precisa, sem quebrar a tabela */
+.executive-pendencias-table td {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.executive-pendencias-table td:nth-child(1),
+.executive-pendencias-table td:nth-child(2),
+.executive-pendencias-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.executive-pendencias-table .descricao-cell {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+/* Inputs e selects compactos */
+.executive-pendencias-table .priority-select,
+.executive-pendencias-table .responsavel-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+/* Ações em modo compacto vertical, sem cortar */
+.pendencia-actions-compact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pendencia-actions-compact .mini-action {
+  width: 100%;
+  padding: 7px 8px;
+  font-size: 11px;
+  line-height: 1;
+  margin: 0;
+}
+
+/* Botões mais limpos em desktop */
+.executive-pendencias-table .badge {
+  white-space: nowrap;
+}
+
+/* Breakpoint intermediário: reduz texto e mantém tudo visível */
+@media (max-width: 1380px) {
+  .pendencias-card {
+    max-width: 100%;
+  }
+
+  .executive-pendencias-table th,
+  .executive-pendencias-table td {
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+
+  .pendencia-actions-compact .mini-action {
+    font-size: 10.5px;
+    padding: 7px 6px;
+  }
+}
+
+/* Em telas menores, vira cards responsivos — sem scroll horizontal */
+@media (max-width: 980px) {
+  .executive-pendencias-table {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .executive-pendencias-table table,
+  .executive-pendencias-table thead,
+  .executive-pendencias-table tbody,
+  .executive-pendencias-table th,
+  .executive-pendencias-table td,
+  .executive-pendencias-table tr {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .executive-pendencias-table thead {
+    display: none;
+  }
+
+  .executive-pendencias-table tr {
+    margin-bottom: 14px;
+    border: 1px solid #e4edf7;
+    border-radius: 18px;
+    background: #ffffff;
+    overflow: hidden;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+  }
+
+  .executive-pendencias-table td {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #edf2f7;
+    white-space: normal !important;
+  }
+
+  .executive-pendencias-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .executive-pendencias-table td::before {
+    color: #73839c;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .executive-pendencias-table td:nth-child(1)::before { content: "Obra"; }
+  .executive-pendencias-table td:nth-child(2)::before { content: "Disciplina"; }
+  .executive-pendencias-table td:nth-child(3)::before { content: "Item"; }
+  .executive-pendencias-table td:nth-child(4)::before { content: "Descrição"; }
+  .executive-pendencias-table td:nth-child(5)::before { content: "Prioridade"; }
+  .executive-pendencias-table td:nth-child(6)::before { content: "Responsável"; }
+  .executive-pendencias-table td:nth-child(7)::before { content: "Status"; }
+  .executive-pendencias-table td:nth-child(8)::before { content: "Ações"; }
+
+  .pendencia-actions-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .executive-pendencias-table td {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .pendencia-actions-compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Impressão limpa */
+@media print {
+  .executive-pendencias-table table,
+  .executive-pendencias-table thead,
+  .executive-pendencias-table tbody,
+  .executive-pendencias-table th,
+  .executive-pendencias-table td,
+  .executive-pendencias-table tr {
+    display: revert;
+  }
+
+  .executive-pendencias-table thead {
+    display: table-header-group;
+  }
+
+  .executive-pendencias-table tr {
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .executive-pendencias-table td::before {
+    content: none !important;
+  }
+}
+
+/* =========================
+   V2.4.6 — PENDÊNCIAS CARD LARGO
+   Mais largura real para a tabela executiva.
+========================= */
+
+.content {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.pendencias-card {
+  width: min(100%, 1760px);
+  max-width: 1760px;
+  padding-left: 42px;
+  padding-right: 42px;
+}
+
+/* ocupa melhor o espaço útil do card */
+.pendencias-toolbar {
+  grid-template-columns: minmax(320px, 1fr) 260px;
+}
+
+.executive-pendencias-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+/* nova divisão de colunas: mais respiro para final da tabela */
+.executive-pendencias-table th:nth-child(1),
+.executive-pendencias-table td:nth-child(1) {
+  width: 12%;
+}
+
+.executive-pendencias-table th:nth-child(2),
+.executive-pendencias-table td:nth-child(2) {
+  width: 10%;
+}
+
+.executive-pendencias-table th:nth-child(3),
+.executive-pendencias-table td:nth-child(3) {
+  width: 14%;
+}
+
+.executive-pendencias-table th:nth-child(4),
+.executive-pendencias-table td:nth-child(4) {
+  width: 20%;
+}
+
+.executive-pendencias-table th:nth-child(5),
+.executive-pendencias-table td:nth-child(5) {
+  width: 9%;
+}
+
+.executive-pendencias-table th:nth-child(6),
+.executive-pendencias-table td:nth-child(6) {
+  width: 12%;
+}
+
+.executive-pendencias-table th:nth-child(7),
+.executive-pendencias-table td:nth-child(7) {
+  width: 9%;
+}
+
+.executive-pendencias-table th:nth-child(8),
+.executive-pendencias-table td:nth-child(8) {
+  width: 14%;
+}
+
+/* ações menos espremidas */
+.pendencia-actions-compact {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.pendencia-actions-compact .mini-action {
+  min-width: 92px;
+}
+
+/* em telas médias, permite scroll só se realmente não couber */
+@media (max-width: 1280px) {
+  .executive-pendencias-table {
+    overflow-x: auto;
+  }
+
+  .executive-pendencias-table table {
+    min-width: 1220px;
+  }
+}
+
+@media (max-width: 980px) {
+  .content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .pendencias-card {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* =========================
+   V2.4.7 — PENDÊNCIAS EM CARDS EXECUTIVOS
+   Solução definitiva para corte de colunas.
+   Escopo 100% isolado na tela Pendências.
+========================= */
+
+/* Remove comportamento de tabela larga na tela Pendências */
+.executive-pendencias-table {
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.executive-pendencias-table table,
+.executive-pendencias-table thead,
+.executive-pendencias-table tbody,
+.executive-pendencias-table th,
+.executive-pendencias-table td,
+.executive-pendencias-table tr {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.executive-pendencias-table thead {
+  display: none;
+}
+
+.executive-pendencias-table tbody {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.executive-pendencias-table tr {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 1.2fr 1.45fr 0.75fr 0.9fr 0.8fr 1.1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid #e4edf7;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.executive-pendencias-table td {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.executive-pendencias-table td::before {
+  display: block;
+  margin-bottom: 7px;
+  color: #73839c;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.executive-pendencias-table td:nth-child(1)::before { content: "Obra"; }
+.executive-pendencias-table td:nth-child(2)::before { content: "Disciplina"; }
+.executive-pendencias-table td:nth-child(3)::before { content: "Item"; }
+.executive-pendencias-table td:nth-child(4)::before { content: "Descrição"; }
+.executive-pendencias-table td:nth-child(5)::before { content: "Prioridade"; }
+.executive-pendencias-table td:nth-child(6)::before { content: "Responsável"; }
+.executive-pendencias-table td:nth-child(7)::before { content: "Status"; }
+.executive-pendencias-table td:nth-child(8)::before { content: "Ações"; }
+
+/* Textos longos ficam limpos, sem cortar área de ação */
+.executive-pendencias-table td:nth-child(1),
+.executive-pendencias-table td:nth-child(2),
+.executive-pendencias-table td:nth-child(3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.executive-pendencias-table .descricao-cell {
+  line-height: 1.42;
+  font-weight: 850;
+}
+
+/* Inputs e selects cabem no card */
+.executive-pendencias-table .priority-select,
+.executive-pendencias-table .responsavel-input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Ações ficam visíveis e elegantes */
+.pendencia-actions-compact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pendencia-actions-compact .mini-action {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  font-size: 11px;
+  line-height: 1.1;
+  margin: 0;
+  text-align: center;
+}
+
+/* Evita que a elipse verde do card cubra os botões */
+.pendencias-card::after {
+  opacity: 0.45;
+  z-index: 0;
+}
+
+.pendencias-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Desktop médio: vira layout em duas linhas, ainda sem corte */
+@media (max-width: 1450px) {
+  .executive-pendencias-table tr {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .executive-pendencias-table td:nth-child(8) {
+    grid-column: span 2;
+  }
+
+  .pendencia-actions-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Tablet/mobile: card vertical */
+@media (max-width: 900px) {
+  .executive-pendencias-table tr {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-pendencias-table td:nth-child(8) {
+    grid-column: auto;
+  }
+
+  .pendencia-actions-compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Impressão continua limpa */
+@media print {
+  .executive-pendencias-table tbody {
+    display: block;
+  }
+
+  .executive-pendencias-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .executive-pendencias-table td::before {
+    display: block;
+  }
+}
+
+/* =========================
+   V2.4.8 — PENDÊNCIAS CARDS LIMPOS
+   Correção definitiva contra embolamento.
+   Não usa mais tabela visual na tela Pendências.
+========================= */
+
+.executive-pendencias-table {
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+}
+
+/* mata qualquer comportamento antigo de tabela apenas dentro de Pendências */
+.executive-pendencias-table table,
+.executive-pendencias-table thead,
+.executive-pendencias-table tbody,
+.executive-pendencias-table tr,
+.executive-pendencias-table th,
+.executive-pendencias-table td {
+  all: unset;
+  box-sizing: border-box;
+}
+
+.executive-pendencias-table table,
+.executive-pendencias-table tbody {
+  display: block;
+  width: 100%;
+}
+
+.executive-pendencias-table thead {
+  display: none !important;
+}
+
+/* cada linha vira um card real */
+.executive-pendencias-table tr {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid #e4edf7;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+/* cada célula vira bloco com label */
+.executive-pendencias-table td {
+  display: block;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.executive-pendencias-table td::before {
+  display: block;
+  margin-bottom: 7px;
+  color: #73839c;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 1.8px;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* labels */
+.executive-pendencias-table td:nth-child(1)::before { content: "Obra"; }
+.executive-pendencias-table td:nth-child(2)::before { content: "Disciplina"; }
+.executive-pendencias-table td:nth-child(3)::before { content: "Item"; }
+.executive-pendencias-table td:nth-child(4)::before { content: "Descrição"; }
+.executive-pendencias-table td:nth-child(5)::before { content: "Prioridade"; }
+.executive-pendencias-table td:nth-child(6)::before { content: "Responsável"; }
+.executive-pendencias-table td:nth-child(7)::before { content: "Status"; }
+.executive-pendencias-table td:nth-child(8)::before { content: "Ações"; }
+
+/* área de descrição mais larga */
+.executive-pendencias-table td:nth-child(4) {
+  grid-column: span 2;
+  white-space: normal;
+}
+
+/* ações ocupam a linha toda no card */
+.executive-pendencias-table td:nth-child(8) {
+  grid-column: span 2;
+  overflow: visible;
+}
+
+/* controles limpos */
+.executive-pendencias-table .priority-select,
+.executive-pendencias-table .responsavel-input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.executive-pendencias-table .badge {
+  display: inline-flex;
+  width: fit-content;
+  white-space: nowrap;
+}
+
+/* botões em linha, sem esmagar */
+.pendencia-actions-compact {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pendencia-actions-compact .mini-action {
+  width: auto !important;
+  min-width: 96px;
+  padding: 9px 12px;
+  margin: 0 !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* em telas médias, 2 colunas */
+@media (max-width: 1280px) {
+  .executive-pendencias-table tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .executive-pendencias-table td:nth-child(4),
+  .executive-pendencias-table td:nth-child(8) {
+    grid-column: span 2;
+  }
+}
+
+/* mobile, 1 coluna */
+@media (max-width: 720px) {
+  .executive-pendencias-table tr {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-pendencias-table td:nth-child(4),
+  .executive-pendencias-table td:nth-child(8) {
+    grid-column: auto;
+  }
+
+  .pendencia-actions-compact {
+    flex-direction: column;
+  }
+
+  .pendencia-actions-compact .mini-action {
+    width: 100% !important;
+  }
+}
+
+/* =========================
+   V2.4.9 — PENDÊNCIAS SEM TABELA
+   Estrutura JSX em cards reais.
+   Esta seção anula só a área antiga de pendências.
+========================= */
+
+.pendencias-card {
+  max-width: 1560px;
+}
+
+.pendencias-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.pendencia-empty {
+  padding: 22px;
+  border: 1px dashed #d8e2ef;
+  border-radius: 18px;
+  background: #fbfdff;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.pendencia-card-item {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #e4edf7;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.pendencia-main-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr 1.4fr 180px;
+  gap: 16px;
+  align-items: end;
+}
+
+.pendencia-footer-grid {
+  display: grid;
+  grid-template-columns: 220px 150px 1fr;
+  gap: 16px;
+  align-items: end;
+}
+
+.pendencia-field,
+.pendencia-description,
+.pendencia-actions-area {
+  min-width: 0;
+}
+
+.pendencia-field span,
+.pendencia-description span,
+.pendencia-actions-area > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #73839c;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 1.8px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.pendencia-field strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pendencia-field-item strong {
+  white-space: normal;
+}
+
+.pendencia-description {
+  padding: 16px 18px;
+  border: 1px solid #edf2f7;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.pendencia-description p {
+  margin: 0;
+  max-width: none;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.pendencia-actions-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pendencia-actions-card .mini-action {
+  min-width: 112px;
+  margin: 0;
+  padding: 10px 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pendencia-card-item .priority-select,
+.pendencia-card-item .responsavel-input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Mata a herança das versões anteriores APENAS se existir classe antiga no DOM */
+.pendencias-card .executive-pendencias-table {
+  display: none !important;
+}
+
+@media (max-width: 1280px) {
+  .pendencia-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pendencia-footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pendencia-actions-card {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pendencia-actions-card .mini-action {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .pendencia-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pendencia-actions-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .pendencias-toolbar,
+  .pendencia-actions-area {
+    display: none !important;
+  }
+
+  .pendencia-card-item {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}
+
+/* =========================
+   V2.5 — UPLOAD + BACKUP INTELIGENTE
+   Escopo isolado.
+========================= */
+
+.evidence-box-v25 {
+  gap: 9px;
+}
+
+.upload-evidence-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.upload-evidence-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(29, 78, 216, 0.12);
+}
+
+.upload-evidence-button input {
+  display: none;
+}
+
+.evidence-file-name {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  word-break: break-all;
+}
+
+.backup-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid #e4edf7;
+  border-radius: 22px;
+  background: #fbfdff;
+}
+
+.backup-panel h3 {
+  margin: 8px 0 6px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.backup-panel p {
+  margin: 0;
+  max-width: 720px;
+}
+
+.backup-panel small {
+  display: block;
+  margin-top: 8px;
+  color: #166534;
+  font-weight: 900;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .backup-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .backup-actions {
+    justify-content: flex-start;
+  }
+}
+
+
+/* =========================
+   NERO V2.6.3 — COMISSIONAMENTO EMBUTIDO
+   Remove sidebar interna e adapta ao shell principal do NERO-App.
+========================= */
+
+.comissionamento-embed {
+  width: 100%;
+  max-width: none;
+  background: transparent;
+}
+
+.comissionamento-embed .sidebar,
+.comissionamento-embed .logo,
+.comissionamento-embed footer {
+  display: none !important;
+}
+
+.comissionamento-embed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 0;
+}
+
+.comissionamento-embed-head h1 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.comissionamento-embed-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.comissionamento-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 22px;
+}
+
+.comissionamento-tabs button {
+  border: 1px solid #d8e2ef;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.comissionamento-tabs button:hover,
+.comissionamento-tabs button.active {
+  background: var(--nero-accent);
+  border-color: var(--nero-accent);
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(34, 197, 94, 0.22);
+}
+
+.comissionamento-content {
+  width: 100%;
+}
+
+.comissionamento-content .content {
+  padding: 0 !important;
+}
+
+.comissionamento-content .page-card {
+  width: 100%;
+  max-width: none;
+}
+
+@media (max-width: 900px) {
+  .comissionamento-embed-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .comissionamento-embed-actions {
+    justify-content: flex-start;
+  }
+}
+
+
+/* =========================
+   NERO V2.7 — Ajuste fino do módulo Comissionamento integrado
+========================= */
+
+.comissionamento-embed {
+  min-width: 0;
+}
+
+.comissionamento-tabs button {
+  white-space: nowrap;
+}
+
+.comissionamento-content .page-card {
+  overflow: hidden;
+}

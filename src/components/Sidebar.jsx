@@ -2,6 +2,7 @@ import React from "react";
 import {
   ChevronRight,
   ClipboardList,
+  ClipboardCheck,
   FolderKanban,
   HardHat,
   LayoutDashboard,
@@ -69,16 +70,30 @@ export default function Sidebar() {
           background: `linear-gradient(180deg, ${nero.sidebar} 0%, ${nero.sidebarSoft} 100%)`,
         }}
       >
-        <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-100">
-          <HardHat className="h-3.5 w-3.5" />
-          NERO Planejamento
+        <div className="flex items-center gap-3">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white p-3 shadow-md">
+            <img
+              src="/logo-nero.png"
+              alt="NERO Construções"
+              className="h-full w-full object-contain"
+            />
+          </div>
+
+          <div className="min-w-0 leading-tight">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-green-200">
+              Sistema Web
+            </p>
+            <h1 className="mt-1 text-2xl font-extrabold leading-none text-white">
+              NERO
+            </h1>
+            <p className="mt-1 text-lg font-extrabold leading-none text-white">
+              CONSTRUÇÕES
+            </p>
+          </div>
         </div>
-        <h2 className="mt-4 text-2xl font-semibold tracking-tight">
-          Sistema de Obras
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-200">
-          Estrutura executiva para planejamento, medições e leitura
-          físico-financeira.
+
+        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-green-200">
+          Gestão inteligente de obras
         </p>
       </div>
 
@@ -112,6 +127,11 @@ export default function Sidebar() {
           icon={FileText}
           label="Relatórios"
           to="/relatorios"
+        />
+        <SidebarItem
+          icon={ClipboardCheck}
+          label="Comissionamento"
+          to="/comissionamento"
         />
       </div>
 

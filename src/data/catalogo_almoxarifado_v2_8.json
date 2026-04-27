@@ -1,0 +1,974 @@
+[
+  {
+    "code": "ASV-001",
+    "description": "Galverette A",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-002",
+    "description": "Galverette B",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-003",
+    "description": "Muzafan 39",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-004",
+    "description": "Espuma expansiva MP90",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-005",
+    "description": "Tubos cola acabamento",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-006",
+    "description": "Cola flex pu maxx construção 400g",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-007",
+    "description": "Adesivo Plástico Amanco",
+    "category": "🧴 Adesivos e Vedação (ADE)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-008",
+    "description": "Adesivo para pisos vinílicos Quartzolit",
+    "category": "🧴 Adesivos e Vedação (ADE)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-009",
+    "description": "Fita Teflon Noah",
+    "category": "🧴 Adesivos e Vedação (ADE)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "ASV-010",
+    "description": "Fita Dupla Face",
+    "category": "🧴 Adesivos e Vedação (ADE)",
+    "prefix": "ASV"
+  },
+  {
+    "code": "DRY-001",
+    "description": "Placa Drywall acústica",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-002",
+    "description": "Lã termo acústica",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-003",
+    "description": "HEM-VÉU",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-004",
+    "description": "Fita papel metálica",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-005",
+    "description": "Fita microperfurada",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-006",
+    "description": "Fita alumínio",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-007",
+    "description": "Fita fibra de vidro",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-008",
+    "description": "Tabica branca",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-009",
+    "description": "Lona elevador",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-010",
+    "description": "Alçapão Clicado com Tampa 40x40cm",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-011",
+    "description": "Montante 70x0,5 x3000 mm",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "DRY-012",
+    "description": "Regulador Nivelador F530 Normat",
+    "category": "🪵 Drywall e Isolamento (DRY)",
+    "prefix": "DRY"
+  },
+  {
+    "code": "ELE-001",
+    "description": "Fio 1,5 mm²",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-002",
+    "description": "Fio 2,5 mm²",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-003",
+    "description": "Fio 4,0 mm²",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-004",
+    "description": "Fio 6,0 mm²",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-005",
+    "description": "Eletroduto 1” Laranja",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-006",
+    "description": "Eletroduto 3/4 Laranja",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-007",
+    "description": "Eletroduto 3/4 Preto",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-008",
+    "description": "Filtro de linha",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-009",
+    "description": "Interruptor simples",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-010",
+    "description": "Tomada 2P+T",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-011",
+    "description": "Placa 4x2 1 posto",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-012",
+    "description": "Placa 4x4 1+1",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-013",
+    "description": "Placa 4x2 2 postos",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-014",
+    "description": "Placa 4x2 3 postos",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-015",
+    "description": "Placa cega 4x2",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-016",
+    "description": "Placa cega 4x4",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-017",
+    "description": "Suporte 4x2",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-018",
+    "description": "Suporte 4x4",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-019",
+    "description": "Lâmpada LED Tubular T8 BYD",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-020",
+    "description": "Lâmpada LED Taschibra",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-021",
+    "description": "Luminária LED 24W",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-022",
+    "description": "Painel Embutir Quadrado Avant",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-023",
+    "description": "Painel Embutir Redondo",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-024",
+    "description": "Spot LED 5W",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-025",
+    "description": "Sensor de Presença",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-026",
+    "description": "Condulete Wetzel",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-027",
+    "description": "Condulete XPW-20 1T",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-028",
+    "description": "Condulete XPW-20 3T",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-029",
+    "description": "Tomada 2P+T",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-030",
+    "description": "Tomada 20A Sob Condulete",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-031",
+    "description": "Caixa Drywall 4x2",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "ELE-032",
+    "description": "Caixa de Passagem",
+    "category": "⚡ Elétrica (ELE)",
+    "prefix": "ELE"
+  },
+  {
+    "code": "FER-001",
+    "description": "Rolo de tinta 23cm",
+    "category": "🛠️ Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-002",
+    "description": "Suporte rolo 23cm",
+    "category": "🛠️ Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-003",
+    "description": "Trinchão",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-004",
+    "description": "Trinchão (cabo quebrado) Tigre",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-005",
+    "description": "Rolo Industrial Atlas",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-006",
+    "description": "Espuma Multiuso Atlas",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-007",
+    "description": "Lixa 180 Tigre",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-008",
+    "description": "Lixa 220 Tigre",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-009",
+    "description": "Lixa 180 Norton",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-010",
+    "description": "Lixa 180 Vonder",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "FER-011",
+    "description": "Lixa 180 3M",
+    "category": "Ferramentas (FER)",
+    "prefix": "FER"
+  },
+  {
+    "code": "GER-001",
+    "description": "Saco para entulho",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-002",
+    "description": "Tábuas",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-003",
+    "description": "Tanque Plástico Astra",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-004",
+    "description": "Bucha nº6",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-005",
+    "description": "Parafuso 3,5x25",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-006",
+    "description": "Parafuso 4,0x45",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-007",
+    "description": "Parafuso 4,5x40",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-008",
+    "description": "Parafuso GN25",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-009",
+    "description": "Fita Crepe",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-010",
+    "description": "Fita Isolante 3M",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-011",
+    "description": "Fita Zebrada",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-012",
+    "description": "Barra apoio 70cm",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "GER-013",
+    "description": "Barra apoio 80cm",
+    "category": "🧰 Materiais Gerais (GER)",
+    "prefix": "GER"
+  },
+  {
+    "code": "HID-001",
+    "description": "Base registro DN20",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-002",
+    "description": "Ligação flexível inox",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-003",
+    "description": "Mangueira de incêndio",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-004",
+    "description": "Tubo de 32 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-005",
+    "description": "Tubo de 40 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-006",
+    "description": "T 40 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-007",
+    "description": "T de 32 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-008",
+    "description": "T 32 / 25 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-009",
+    "description": "Curva 32 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-010",
+    "description": "Redução de 32/25 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-011",
+    "description": "Joelho de 32 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-012",
+    "description": "Luva de 40 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-013",
+    "description": "Luva de 32 mm Água fria",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-014",
+    "description": "Tubo de 75 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-015",
+    "description": "Joelho de 75 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-016",
+    "description": "Redução 50/40 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-017",
+    "description": "Luva de 50 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-018",
+    "description": "Junção de 40 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-019",
+    "description": "Junção de 50 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-020",
+    "description": "Luva de 75 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-021",
+    "description": "T de 50 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-022",
+    "description": "Luva de 100 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-023",
+    "description": "Joelho de 100 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-024",
+    "description": "Curva de 100 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-025",
+    "description": "Curva de 40 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "HID-026",
+    "description": "Curva de 75 mm Esgoto",
+    "category": "🔧 Hidráulica (HID)",
+    "prefix": "HID"
+  },
+  {
+    "code": "LME-001",
+    "description": "Bacia acoplada Span Round",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-002",
+    "description": "Vaso Acoplado Vertis Total Clean",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-003",
+    "description": "Lavatório Flox Branco",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-004",
+    "description": "Coluna Suspensa Flox/Primula/Lirio",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-005",
+    "description": "Cuba Apoio 410x310 Branco",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-006",
+    "description": "Cuba Semi Encaixe 40cm",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-007",
+    "description": "Torneira Bica Baixa Automática",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-008",
+    "description": "Torneira Cozinha Flex Plus",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-009",
+    "description": "Torneira Lavatório Automática Celite",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-010",
+    "description": "Torneira Lavatório Spot",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-011",
+    "description": "Torneira Jardim",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-012",
+    "description": "Sifão Lavatório",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-013",
+    "description": "Sifão Extensivo",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-014",
+    "description": "Válvula Escapamento",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-015",
+    "description": "Válvula DN32",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-016",
+    "description": "Registro gaveta",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "LME-017",
+    "description": "Acabamento Registro",
+    "category": "🚿 Louças e Metais (LME)",
+    "prefix": "LME"
+  },
+  {
+    "code": "MCO-001",
+    "description": "Argamassa 12kg Argalit",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-002",
+    "description": "Argamassa 20kg Argalit",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-003",
+    "description": "Argamassa AC3",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-004",
+    "description": "Argamassa C3",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-005",
+    "description": "Cimento poty cpII 50kg",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-006",
+    "description": "Massa acrílica 20kg Argalit",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-007",
+    "description": "Massa Corrida PVA 23kg",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-008",
+    "description": "Massa de Reajunte Drywall 25kg",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-009",
+    "description": "Massa Maxcryl 25kg",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-010",
+    "description": "Fundo Preparador de Paredes 18L",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-011",
+    "description": "Texturalit 23kg",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "MCO-012",
+    "description": "Bloco",
+    "category": "Materiais de Construção (MCO)",
+    "prefix": "MCO"
+  },
+  {
+    "code": "PRN-001",
+    "description": "Piso vinílico 2,30",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-002",
+    "description": "Piso vinílico 90x90",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-003",
+    "description": "Eco painel Liso Click PL.31 Guelph 2800x600x900mm Interno",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-004",
+    "description": "Espaçador Nivelador Slim 2,0 mm",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-005",
+    "description": "Cunha Nivelador Cortag",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-006",
+    "description": "Espaçador Nivelador Slim 3,0 mm",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-007",
+    "description": "Espaçador Nivelador Estreito 2 mm",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-008",
+    "description": "Rejunte CZ Platina",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "PRN-009",
+    "description": "Embaia Prepara Pro Quartzolit",
+    "category": "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+    "prefix": "PRN"
+  },
+  {
+    "code": "TIN-001",
+    "description": "Aditivo Acrílico HEM-1135 20L",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-002",
+    "description": "Aditivo Acrílico HEM-1144 20L",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-003",
+    "description": "Thinner 300ml",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-004",
+    "description": "Tinta Coral Verde Artesão",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-005",
+    "description": "Tinta Coral Bege Cevada",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-006",
+    "description": "Tinta Coral Floresta Negra",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "TIN-007",
+    "description": "Suvinil Rende & Cobre 18L Branco",
+    "category": "🎨 Tintas e Complementos (TIN)",
+    "prefix": "TIN"
+  },
+  {
+    "code": "UEP-001",
+    "description": "Bota nº 40",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-002",
+    "description": "Capacete amarelo",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-003",
+    "description": "Capa de chuva",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-004",
+    "description": "Luva",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-005",
+    "description": "Luva látex GG",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-006",
+    "description": "Máscara",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-007",
+    "description": "Óculos de proteção",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-008",
+    "description": "Protetor auricular",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-009",
+    "description": "Calça P",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-010",
+    "description": "Calça G",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-011",
+    "description": "Calça GG",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-012",
+    "description": "Camisa G",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  },
+  {
+    "code": "UEP-013",
+    "description": "Camisa GG",
+    "category": "🦺Uniformes e EPIs (UEP)",
+    "prefix": "UEP"
+  }
+]

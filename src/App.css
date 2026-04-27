@@ -182,3 +182,58 @@
     border-right-color: var(--border);
   }
 }
+
+
+/* =========================
+   NERO V2.7 — CONSOLIDAÇÃO FINAL / PRÉ-PRODUÇÃO
+   Ajustes seguros e localizados.
+========================= */
+
+/* Evita estouro do bloco da logo */
+.sidebar-logo-text,
+.nero-sidebar-logo-text {
+  max-width: 150px;
+  overflow: hidden;
+}
+
+/* Evita que textos longos estourem nos cards */
+.card,
+.quick-card,
+.page-card,
+.pendencia-card-item {
+  overflow-wrap: anywhere;
+}
+
+/* Área principal preservada e estável */
+main,
+.main-content {
+  min-width: 0;
+}
+
+/* Botões mantêm comportamento previsível */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Impressão: evita botões/menus no relatório */
+@media print {
+  .no-print,
+  .sidebar,
+  aside,
+  nav {
+    display: none !important;
+  }
+}
+
+
+/* =========================
+   NERO V2.8 — ALMOXARIFADO BLINDADO
+========================= */
+
+.stock-catalog-only {
+  opacity: 0.96;
+}
+
+#stock-code-input {
+  text-transform: uppercase;
+}
