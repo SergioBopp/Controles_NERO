@@ -2467,3 +2467,29 @@ td {
 .comissionamento-content .page-card {
   overflow: hidden;
 }
+
+
+/* =========================
+   V2.6.1 — Botão excluir pendência
+   Escopo isolado no Comissionamento.
+========================= */
+
+.pendencia-actions-card .mini-action.delete,
+.mini-action.delete {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.pendencia-actions-card .mini-action.delete:hover,
+.mini-action.delete:hover {
+  background: #fecaca;
+  color: #7f1d1d;
+  transform: translateY(-1px);
+}
+
+@media print {
+  .mini-action.delete {
+    display: none !important;
+  }
+}

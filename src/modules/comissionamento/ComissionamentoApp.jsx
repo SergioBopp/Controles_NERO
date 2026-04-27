@@ -673,6 +673,31 @@ function ComissionamentoApp() {
   }
 
 
+
+  async function excluirPendencia(pendenciaId) {
+    const confirmar = window.confirm(
+      "Tem certeza que deseja excluir esta pendência? Esta ação não poderá ser desfeita."
+    );
+
+    if (!confirmar) return;
+
+    setFeedback("");
+
+    const { error } = await supabase
+      .from("pendencias")
+      .delete()
+      .eq("id", pendenciaId);
+
+    if (error) {
+      setFeedback("Erro ao excluir pendência: " + error.message);
+      return;
+    }
+
+    setFeedback("Pendência excluída com sucesso.");
+    await carregarDados();
+  }
+
+
   return (
     <div className="comissionamento-embed">
       <section className="comissionamento-embed-head">
@@ -1232,6 +1257,9 @@ function ComissionamentoApp() {
                             </button>
                             <button type="button" className="mini-action ok" onClick={() => atualizarPendencia(pendencia.id, "status", "Resolvida")}>
                               Resolvida
+                            </button>
+                            <button type="button" className="mini-action delete" onClick={() => excluirPendencia(pendencia.id)}>
+                              Excluir
                             </button>
                           </div>
                         </div>
