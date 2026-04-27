@@ -109,6 +109,7 @@ function ComissionamentoApp() {
   const [filtroTextoPendencia, setFiltroTextoPendencia] = useState("");
   const [uploadingItemId, setUploadingItemId] = useState("");
   const [backupGerado, setBackupGerado] = useState(null);
+  const [pendenciaExcluidaUndo, setPendenciaExcluidaUndo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState("");
 
@@ -674,26 +675,56 @@ function ComissionamentoApp() {
 
 
 
-  async function excluirPendencia(pendenciaId) {
+  async function excluirPendenciaComUndo(pendencia) {
     const confirmar = window.confirm(
-      "Tem certeza que deseja excluir esta pendência? Esta ação não poderá ser desfeita."
+      "Tem certeza que deseja excluir esta pendência? Você poderá desfazer por 5 segundos."
     );
 
     if (!confirmar) return;
 
     setFeedback("");
+    const backupPendencia = { ...pendencia };
 
     const { error } = await supabase
       .from("pendencias")
       .delete()
-      .eq("id", pendenciaId);
+      .eq("id", pendencia.id);
 
     if (error) {
       setFeedback("Erro ao excluir pendência: " + error.message);
       return;
     }
 
-    setFeedback("Pendência excluída com sucesso.");
+    setPendenciaExcluidaUndo(backupPendencia);
+    setFeedback("Pendência excluída. Você pode desfazer por 5 segundos.");
+    await carregarDados();
+
+    window.setTimeout(() => {
+      setPendenciaExcluidaUndo((atual) => {
+        if (atual?.id === backupPendencia.id) return null;
+        return atual;
+      });
+    }, 5000);
+  }
+
+  async function desfazerExclusaoPendencia() {
+    if (!pendenciaExcluidaUndo) return;
+
+    const payload = { ...pendenciaExcluidaUndo };
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    const { error } = await supabase
+      .from("pendencias")
+      .insert(payload);
+
+    if (error) {
+      setFeedback("Erro ao desfazer exclusão: " + error.message);
+      return;
+    }
+
+    setPendenciaExcluidaUndo(null);
+    setFeedback("Exclusão desfeita com sucesso.");
     await carregarDados();
   }
 
@@ -707,6 +738,16 @@ function ComissionamentoApp() {
         </div>
 
         <div className="comissionamento-embed-actions">
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              if (typeof onBackHome === "function") onBackHome();
+              else setView("dashboard");
+            }}
+          >
+            Voltar início
+          </button>
           <span className="status">● {loading ? "Sincronizando" : "Online"}</span>
           <button className="btn" onClick={carregarDados}>Atualizar</button>
           <button
@@ -737,6 +778,15 @@ function ComissionamentoApp() {
           </button>
         ))}
       </nav>
+
+      {pendenciaExcluidaUndo && (
+        <div className="undo-toast no-print">
+          <span>Pendência excluída.</span>
+          <button type="button" onClick={desfazerExclusaoPendencia}>
+            Desfazer
+          </button>
+        </div>
+      )}
 
       <div className="comissionamento-content">
 {feedback && <div className="alert">{feedback}</div>}
@@ -1257,9 +1307,6 @@ function ComissionamentoApp() {
                             </button>
                             <button type="button" className="mini-action ok" onClick={() => atualizarPendencia(pendencia.id, "status", "Resolvida")}>
                               Resolvida
-                            </button>
-                            <button type="button" className="mini-action delete" onClick={() => excluirPendencia(pendencia.id)}>
-                              Excluir
                             </button>
                           </div>
                         </div>

@@ -2470,9 +2470,11 @@ td {
 
 
 /* =========================
-   V2.6.1 — Botão excluir pendência
-   Escopo isolado no Comissionamento.
+   NERO V2.6.5 — Voltar início + Excluir pendência com Undo
 ========================= */
+.comissionamento-embed-actions .btn {
+  white-space: nowrap;
+}
 
 .pendencia-actions-card .mini-action.delete,
 .mini-action.delete {
@@ -2488,8 +2490,37 @@ td {
   transform: translateY(-1px);
 }
 
+.undo-toast {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid #bbf7d0;
+  border-radius: 18px;
+  background: #ecfdf5;
+  color: #065f46;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+  font-weight: 900;
+}
+
+.undo-toast button {
+  border: 0;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  padding: 8px 14px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
 @media print {
-  .mini-action.delete {
+  .mini-action.delete,
+  .undo-toast {
     display: none !important;
   }
 }

@@ -237,3 +237,58 @@ button {
 #stock-code-input {
   text-transform: uppercase;
 }
+
+
+/* =========================
+   NERO V2.6.5 — Planejamento colapsável limpo
+========================= */
+
+
+/* =========================
+   V2.6.7 — Busca Inteligente corrigida de verdade
+   Ajuste aplicado no JSX + CSS.
+========================= */
+
+.stock-search-header {
+  width: 100%;
+}
+
+.stock-search-copy {
+  min-width: 0;
+  width: 100%;
+}
+
+.stock-search-copy h3 {
+  max-width: none !important;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.stock-search-copy p {
+  max-width: none !important;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.55;
+}
+
+.stock-search-controls {
+  min-width: min(100%, 520px);
+}
+
+@media (min-width: 1280px) {
+  .stock-search-copy h3 {
+    white-space: nowrap;
+  }
+
+  .stock-search-copy p {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1279px) {
+  .stock-search-controls {
+    min-width: 0;
+    width: 100%;
+  }
+}

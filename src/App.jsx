@@ -1865,6 +1865,8 @@ function LogoBlock() {
 }
 
 function Sidebar({ currentPage, setCurrentPage }) {
+  const [planejamentoOpen, setPlanejamentoOpen] = useState(false);
+
   const sidebarPages = ["dashboard", "stock", "diarias", "maintenance", "attendance", "history", "comissionamento"];
   const planejamentoPages = [
     "planejamento-dashboard",
@@ -1906,28 +1908,36 @@ function Sidebar({ currentPage, setCurrentPage }) {
             "mb-2 rounded-2xl border px-3.5 py-3",
             planejamentoActive ? "bg-white/10 border-white/15" : "bg-white/5 border-transparent"
           )}>
-            <div className="flex items-center gap-3 text-emerald-50">
+            <button
+              type="button"
+              onClick={() => setPlanejamentoOpen((open) => !open)}
+              className="w-full flex items-center gap-3 text-emerald-50 text-left"
+            >
               <LayoutDashboard className="h-6 w-6" />
               <span className="font-semibold text-[15px]">Planejamento</span>
-            </div>
-            <div className="mt-3 space-y-2">
-              {planejamentoPages.map((key) => {
-                const item = pages[key];
-                const active = currentPage === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setCurrentPage(key)}
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-2 text-left text-sm transition-all",
-                      active ? "bg-white text-emerald-900 border-white shadow-sm" : "bg-white/5 text-emerald-50 border-transparent hover:bg-white/10 hover:border-white/20"
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
+              <span className="ml-auto text-lg font-black leading-none">{planejamentoOpen ? "▾" : "▸"}</span>
+            </button>
+
+            {planejamentoOpen && (
+              <div className="mt-3 space-y-2">
+                {planejamentoPages.map((key) => {
+                  const item = pages[key];
+                  const active = currentPage === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setCurrentPage(key)}
+                      className={cn(
+                        "w-full rounded-xl border px-3 py-2 text-left text-sm transition-all",
+                        active ? "bg-white text-emerald-900 border-white shadow-sm" : "bg-white/5 text-emerald-50 border-transparent hover:bg-white/10 hover:border-white/20"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -2252,13 +2262,13 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
       <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-4">
         <Card>
           <div className="p-5 space-y-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <div>
+            <div className="stock-search-header flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(520px,1fr)_auto] xl:items-end">
+              <div className="stock-search-copy min-w-0">
                 <p className="text-sm font-semibold tracking-wide text-emerald-700 uppercase">Busca inteligente</p>
                 <h3 className="text-2xl font-bold text-slate-900">Consulta rápida de materiais</h3>
                 <p className="text-sm text-slate-500">Pesquise por código, descrição, grupo ou parte do nome do material.</p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 xl:items-center">
+              <div className="stock-search-controls flex flex-col sm:flex-row gap-2 xl:items-center">
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
                   <Search className="h-4 w-4 text-slate-400" />
                   <input
@@ -6238,7 +6248,7 @@ export default function App() {
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
-                  {currentPage === "comissionamento" && <ComissionamentoApp />}
+                  {currentPage === "comissionamento" && <ComissionamentoApp onBackHome={() => setCurrentPage("dashboard")} />}
                   {currentPage === "planejamento-dashboard" && (
                   <PlanejamentoDashboard obraId={obraAtual?.id} obraNome={obraAtual?.nome} />
                 )}
