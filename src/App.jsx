@@ -4967,6 +4967,11 @@ export default function App() {
   }
 
   function openStockMovementModal(item, type = "entrada") {
+    const parsed = parseStockItemLabel(item?.item || "");
+    const code = item?.code || parsed.code || String(item?.id || "").replace(/^catalog-/, "");
+    const material = item?.material || parsed.description || item?.item || "";
+
+    setErrorMessage("");
     setStockMovementForm({
       itemId: item?.id || "",
       type,
@@ -4974,6 +4979,14 @@ export default function App() {
       note: "",
       responsible: "",
       date: getTodayISO(),
+      code,
+      material,
+      itemLabel: buildStockItemLabel(code, material),
+      unit: item?.unit || "un",
+      category: item?.category || "Material",
+      min: Number(item?.min || 0),
+      price: Number(item?.price || 0),
+      invoice: item?.invoice || "",
     });
     setStockMovementModal(true);
   }
@@ -5747,20 +5760,38 @@ export default function App() {
   }
 
   async function saveStockMovement() {
-    const qty = Number(stockMovementForm.quantity || 0);
+    setErrorMessage("");
+
+    const qty = Number(String(stockMovementForm.quantity || "").replace(",", "."));
     if (!stockMovementForm.itemId || qty <= 0) {
       setErrorMessage("Informe item e quantidade da movimentação.");
       return;
     }
 
-    const currentItem = (data.stock || []).find((item) => sameId(item.id, stockMovementForm.itemId));
-    if (!currentItem) {
-      setErrorMessage("Material não encontrado.");
+    const movementType = normalizeStockMovementType(stockMovementForm.type);
+    if (!['entrada', 'saida'].includes(movementType)) {
+      setErrorMessage("Tipo de movimentação inválido.");
       return;
     }
 
-    const currentQty = calculateStockBalance(currentItem.id, data.stockMovements || [], Number(currentItem.quantity || 0));
-    const movementType = normalizeStockMovementType(stockMovementForm.type);
+    let currentItem = (data.stock || []).find((item) => sameId(item.id, stockMovementForm.itemId));
+    let effectiveItemId = currentItem?.id || "";
+
+    const fallbackCode = String(stockMovementForm.code || stockMovementForm.itemId || "").replace(/^catalog-/, "").trim().toUpperCase();
+    const catalogEntry = getStockCatalogEntry(fallbackCode, stockCatalogEntries) || getStockCatalogEntry(fallbackCode, STOCK_CODE_CATALOG);
+    const fallbackMaterial = String(stockMovementForm.material || catalogEntry?.description || "").trim();
+    const fallbackLabel = String(stockMovementForm.itemLabel || buildStockItemLabel(fallbackCode, fallbackMaterial)).trim();
+    const fallbackCategory = String(stockMovementForm.category || catalogEntry?.category || "Material").trim() || "Material";
+    const fallbackUnit = String(stockMovementForm.unit || "un").trim() || "un";
+
+    if (!currentItem && !fallbackLabel) {
+      setErrorMessage("Material não encontrado para movimentação.");
+      return;
+    }
+
+    const currentQty = currentItem
+      ? calculateStockBalance(currentItem.id, data.stockMovements || [], Number(currentItem.quantity || 0))
+      : 0;
     const nextQty = movementType === "entrada" ? currentQty + qty : currentQty - qty;
 
     if (movementType === "saida" && nextQty < 0) {
@@ -5768,18 +5799,87 @@ export default function App() {
       return;
     }
 
-    const movement = {
-      id: generateUuid(),
-      obraId,
-      itemId: currentItem.id,
-      type: normalizeStockMovementType(stockMovementForm.type),
-      quantity: qty,
-      note: stockMovementForm.note,
-      responsible: normalizeResponsibleName(stockMovementForm.responsible),
-      date: stockMovementForm.date || getTodayISO(),
-    };
-
     if (onlineMode && isSupabaseConfigured) {
+      if (!currentItem) {
+        const newItemId = generateId();
+        const insertPayload = {
+          id: newItemId,
+          obra_id: obraId,
+          item: fallbackLabel,
+          unit: fallbackUnit,
+          quantity: 0,
+          min_quantity: Number(stockMovementForm.min || 0),
+          category: fallbackCategory,
+          invoice: stockMovementForm.invoice || "",
+          price: Number(stockMovementForm.price || 0),
+          remarks: "",
+        };
+
+        const { data: insertedItem, error: itemInsertError } = await supabase
+          .from("stock_items")
+          .insert(insertPayload)
+          .select("*")
+          .single();
+
+        if (itemInsertError) {
+          if (String(itemInsertError.code || "") === "23505") {
+            const { data: existingItems, error: selectError } = await supabase
+              .from("stock_items")
+              .select("*")
+              .eq("obra_id", obraId)
+              .eq("item", fallbackLabel)
+              .limit(1);
+
+            if (selectError) return setErrorMessage(selectError.message);
+            currentItem = Array.isArray(existingItems) && existingItems.length ? normalizeLegacyStockItem({
+              id: existingItems[0].id,
+              obraId: existingItems[0].obra_id,
+              item: existingItems[0].item,
+              unit: existingItems[0].unit,
+              quantity: existingItems[0].quantity,
+              min: existingItems[0].min_quantity,
+              category: existingItems[0].category,
+              invoice: existingItems[0].invoice,
+              price: existingItems[0].price,
+              remarks: existingItems[0].remarks,
+            }) : null;
+            effectiveItemId = currentItem?.id || "";
+          } else {
+            return setErrorMessage(itemInsertError.message);
+          }
+        } else {
+          currentItem = normalizeLegacyStockItem({
+            id: insertedItem.id,
+            obraId: insertedItem.obra_id,
+            item: insertedItem.item,
+            unit: insertedItem.unit,
+            quantity: insertedItem.quantity,
+            min: insertedItem.min_quantity,
+            category: insertedItem.category,
+            invoice: insertedItem.invoice,
+            price: insertedItem.price,
+            remarks: insertedItem.remarks,
+          });
+          effectiveItemId = currentItem.id;
+        }
+      }
+
+      if (!effectiveItemId) {
+        setErrorMessage("Não foi possível identificar o material para salvar a movimentação.");
+        return;
+      }
+
+      const movement = {
+        id: generateUuid(),
+        obraId,
+        itemId: effectiveItemId,
+        type: movementType,
+        quantity: qty,
+        note: String(stockMovementForm.note || "").trim(),
+        responsible: normalizeResponsibleName(stockMovementForm.responsible),
+        date: stockMovementForm.date || getTodayISO(),
+      };
+
       const { error: movementError } = await supabase.from("stock_movements").insert({
         id: movement.id,
         obra_id: movement.obraId,
@@ -5792,17 +5892,61 @@ export default function App() {
       });
 
       if (movementError) return setErrorMessage(movementError.message);
+
+      // Mantém o cache quantity coerente, mas a tela continua calculando o saldo pelas movimentações.
+      await supabase
+        .from("stock_items")
+        .update({ quantity: nextQty })
+        .eq("id", effectiveItemId);
+
+      setStockMovementModal(false);
+      setStockMovementForm({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
       await fetchAllData();
-    } else {
-      commitDataUpdate((prev) => ({
-        ...prev,
-        stockMovements: [movement, ...(prev.stockMovements || [])],
-        stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
-      }));
+      return;
     }
 
+    // Modo local/offline: se o item ainda for apenas do catálogo, cadastra antes de movimentar.
+    if (!currentItem) {
+      currentItem = normalizeLegacyStockItem({
+        id: generateId(),
+        obraId,
+        item: fallbackLabel,
+        unit: fallbackUnit,
+        quantity: 0,
+        min: Number(stockMovementForm.min || 0),
+        category: fallbackCategory,
+        invoice: stockMovementForm.invoice || "",
+        price: Number(stockMovementForm.price || 0),
+        remarks: "",
+      });
+      effectiveItemId = currentItem.id;
+    }
+
+    const movement = {
+      id: generateUuid(),
+      obraId,
+      itemId: effectiveItemId,
+      type: movementType,
+      quantity: qty,
+      note: String(stockMovementForm.note || "").trim(),
+      responsible: normalizeResponsibleName(stockMovementForm.responsible),
+      date: stockMovementForm.date || getTodayISO(),
+    };
+
+    commitDataUpdate((prev) => {
+      const alreadyExists = (prev.stock || []).some((item) => sameId(item.id, effectiveItemId));
+      return {
+        ...prev,
+        stock: alreadyExists
+          ? (prev.stock || []).map((item) => sameId(item.id, effectiveItemId) ? { ...item, quantity: nextQty } : item)
+          : [currentItem, ...(prev.stock || [])],
+        stockMovements: [movement, ...(prev.stockMovements || [])],
+        stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
+      };
+    });
+
     const updatedItem = { ...currentItem, quantity: nextQty, saldo: nextQty };
-    if (selectedStockItem && sameId(selectedStockItem.id, currentItem.id)) {
+    if (selectedStockItem && sameId(selectedStockItem.id, effectiveItemId)) {
       setSelectedStockItem(updatedItem);
     }
     setStockMovementModal(false);
@@ -6935,7 +7079,7 @@ export default function App() {
 
       <Modal open={stockMovementModal} title={stockMovementForm.type === "entrada" ? "Entrada de material" : "Saída de material"} onClose={() => setStockMovementModal(false)}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Quantidade"><Input type="number" min="0" step="0.01" value={stockMovementForm.quantity} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
+          <Field label="Quantidade"><Input type="number" min="0" step="0.1" value={stockMovementForm.quantity} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
           <Field label="Data"><Input type="date" value={stockMovementForm.date} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, date: e.target.value }))} /></Field>
           <Field label="Responsável">
             <Input list="stock-responsible-options" value={stockMovementForm.responsible} onChange={(e) => setStockMovementForm((prev) => ({ ...prev, responsible: e.target.value }))} placeholder="Selecione ou digite o responsável" />
@@ -6950,7 +7094,7 @@ export default function App() {
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setStockMovementModal(false)}>Cancelar</Button>
-          <Button onClick={saveStockMovement}>Salvar movimentação</Button>
+          <Button type="button" onClick={saveStockMovement}>Salvar movimentação</Button>
         </div>
       </Modal>
 
