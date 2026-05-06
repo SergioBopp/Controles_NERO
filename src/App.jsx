@@ -2120,7 +2120,8 @@ function getMaintenanceSortWeight(item) {
 function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToDiarias, onGoToHistory, onGoToComissionamento }) {
   const pendingCount = data.maintenance.filter((item) => getMaintenanceStatus(item) !== "Entregue").length;
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
-  const criticalStock = data.stock.filter((item) => Number(item.quantity) < Number(item.min)).length;
+  const stockBalanceRows = buildStockBalanceRows(data.stock || [], data.stockMovements || []);
+  const criticalStock = stockBalanceRows.filter((item) => Number(item.saldo || 0) < Number(item.min || 0)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
   const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.totalCost || item.cost || item.estimated_cost || 0), 0);
 
@@ -2165,7 +2166,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, cleanupFeedback = "" }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
   const stockBalanceRows = buildStockBalanceRows(stock, stockMovements);
   const [reportQuery, setReportQuery] = useState("");
   const [reportCategory, setReportCategory] = useState("Todas");
@@ -2216,7 +2217,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
     const grouped = new Map();
 
     (stockMovements || [])
-      .filter((mv) => mv.type === "saida")
+      .filter((mv) => normalizeStockMovementType(mv.type) === "saida")
       .filter((mv) => {
         const date = String(mv.date || "");
         if (startDate && date < startDate) return false;
@@ -2250,7 +2251,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
 
   return (
     <div className="space-y-5">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onRegularizeInitialStock}><Package className="h-4 w-4" /> Regularizar saldo inicial</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       {cleanupFeedback ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{cleanupFeedback}</div> : null}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <HomeStatCard title="Itens consolidados" value={stockBalanceRows.length} subtitle="Materiais ativos da obra atual" icon={Package} />
@@ -2323,11 +2324,11 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
                           {itemMovements.slice(0, 3).map((mv) => (
                             <div key={mv.id} className="flex items-center justify-between gap-3 text-sm">
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-800">{mv.type === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
+                                <p className="font-medium text-slate-800">{normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
                                 <p className="text-slate-500 truncate">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
                               </div>
-                              <Badge className={mv.type === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
-                                {mv.type === "entrada" ? "+" : "-"} {mv.quantity}
+                              <Badge className={normalizeStockMovementType(mv.type) === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
+                                {normalizeStockMovementType(mv.type) === "entrada" ? "+" : "-"} {mv.quantity}
                               </Badge>
                             </div>
                           ))}
@@ -3055,6 +3056,31 @@ function addPageNumbers(doc) {
 }
 
 
+function normalizeStockMovementType(type) {
+  const value = String(type || "").trim().toLowerCase();
+  if (["entrada", "entry", "in"].includes(value)) return "entrada";
+  if (["saida", "saída", "saída", "exit", "out"].includes(value)) return "saida";
+  return value;
+}
+
+function calculateStockBalance(itemIds, stockMovements = [], fallbackQuantity = 0) {
+  const ids = Array.isArray(itemIds) ? itemIds : [itemIds];
+  const validIds = ids.filter((id) => id !== undefined && id !== null && String(id) !== "");
+  const relatedMovements = (stockMovements || []).filter((mv) => validIds.some((id) => sameId(id, mv.itemId)));
+
+  if (!relatedMovements.length) {
+    return Number(fallbackQuantity || 0);
+  }
+
+  return relatedMovements.reduce((total, mv) => {
+    const qty = Number(mv.quantity || 0);
+    const type = normalizeStockMovementType(mv.type);
+    if (type === "entrada") return total + qty;
+    if (type === "saida") return total - qty;
+    return total;
+  }, 0);
+}
+
 function buildStockBalanceRows(stockItems = [], stockMovements = []) {
   const grouped = new Map();
 
@@ -3064,11 +3090,12 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
     const key = `${canonical.code}::${canonical.description}`;
     const itemMovements = (stockMovements || []).filter((mv) => sameId(mv.itemId, item.id));
     const entrada = itemMovements
-      .filter((mv) => mv.type === "entrada")
+      .filter((mv) => normalizeStockMovementType(mv.type) === "entrada")
       .reduce((acc, mv) => acc + Number(mv.quantity || 0), 0);
     const saida = itemMovements
-      .filter((mv) => mv.type === "saida")
+      .filter((mv) => normalizeStockMovementType(mv.type) === "saida")
       .reduce((acc, mv) => acc + Number(mv.quantity || 0), 0);
+    const saldoCalculado = calculateStockBalance(item.id, stockMovements, Number(item.quantity || 0));
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -3080,6 +3107,7 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
         entrada: 0,
         saida: 0,
         saldo: 0,
+        quantity: 0,
         unit: item.unit || "un",
         category: canonical.category || item?.category || "Material",
         min: 0,
@@ -3095,7 +3123,8 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
     }
     current.entrada += entrada;
     current.saida += saida;
-    current.saldo += Number(item.quantity || 0);
+    current.saldo += saldoCalculado;
+    current.quantity = current.saldo;
     current.min += Number(item.min || 0);
     if (!current.invoice && item.invoice) current.invoice = item.invoice;
     if (!current.price && Number(item.price || 0) > 0) current.price = Number(item.price || 0);
@@ -3230,13 +3259,13 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual, se
     const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "", item?.category);
     return [
       formatDateBR(mv.date),
-      mv.type === "entrada" ? "Entrada" : "Saída",
+      normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída",
       canonical.code || "-",
       canonical.description || item?.item || "-",
       mv.responsible || "-",
       mv.note || "-",
-      `${mv.type === "entrada" ? "+" : "-"} ${mv.quantity}`,
-      item ? `${item.quantity} ${item.unit}` : "-",
+      `${normalizeStockMovementType(mv.type) === "entrada" ? "+" : "-"} ${mv.quantity}`,
+      item ? `${calculateStockBalance(item.id, stockMovements, item.quantity)} ${item.unit}` : "-",
     ];
   });
 
@@ -4697,6 +4726,7 @@ export default function App() {
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [stockEditModal, setStockEditModal] = useState(false);
   const [editingStockId, setEditingStockId] = useState("");
+  const [editingStockItemIds, setEditingStockItemIds] = useState([]);
   const [stockPickerModal, setStockPickerModal] = useState({ open: false, mode: "view" });
   const [stockPickerItemId, setStockPickerItemId] = useState("");
   const [stockPickerQuery, setStockPickerQuery] = useState("");
@@ -4954,17 +4984,22 @@ export default function App() {
   }
 
   function openStockEditModal(item) {
-    const parsed = parseStockItemLabel(item?.item);
-    setEditingStockId(item?.id || "");
+    const parsed = parseStockItemLabel(item?.item || "");
+    const sourceIds = Array.isArray(item?.itemIds) && item.itemIds.length ? item.itemIds : (item?.id ? [item.id] : []);
+    const primaryId = sourceIds[0] || item?.id || "";
+
+    setEditingStockId(primaryId);
+    setEditingStockItemIds(sourceIds);
     setStockForm({
-      code: parsed.code || "",
-      item: parsed.description || item?.item || "",
+      code: item?.code || parsed.code || "",
+      item: item?.material || parsed.description || item?.item || "",
       unit: item?.unit || "un",
-      quantity: Number(item?.quantity || 0),
+      quantity: Number(item?.saldo ?? item?.quantity ?? 0),
       min: Number(item?.min || 0),
       category: item?.category || "Material",
       invoice: item?.invoice || "",
       price: Number(item?.price || 0),
+      remarks: item?.remarks || "",
     });
     setStockEditModal(true);
   }
@@ -5599,6 +5634,118 @@ export default function App() {
     setAttendanceBatchQuantities({});
   }
 
+  async function regularizeInitialStockBalances() {
+    if (!obraAtual) return;
+
+    const overrides = {
+      "ASV-005": 25,
+      "ELE-013": 40,
+      "ELE-017": 132,
+    };
+
+    const confirmed = window.confirm(
+      "Executar regularização inicial do estoque?\n\n" +
+      "Esta rotina cria uma ENTRADA INICIAL para itens que hoje possuem saldo direto no cadastro.\n\n" +
+      "Correções especiais:\n" +
+      "ASV-005 = 25 un\n" +
+      "ELE-013 = 40 un\n" +
+      "ELE-017 = 132 un\n\n" +
+      "Execute apenas uma vez."
+    );
+
+    if (!confirmed) return;
+
+    const stockItems = filteredData.stock || [];
+    const movements = filteredData.stockMovements || [];
+
+    const getCode = (item) => {
+      const parsed = parseStockItemLabel(item?.item || "");
+      return String(item?.code || parsed.code || "").trim().toUpperCase();
+    };
+
+    const overrideCodes = new Set(Object.keys(overrides));
+    const overrideItems = stockItems.filter((item) => overrideCodes.has(getCode(item)));
+    const overrideItemIds = overrideItems.map((item) => item.id);
+
+    const regularizationMovements = [];
+    const itemsWithMovement = new Set(
+      movements
+        .filter((mv) => !overrideItemIds.some((id) => sameId(id, mv.itemId)))
+        .map((mv) => String(mv.itemId))
+    );
+
+    stockItems.forEach((item) => {
+      const code = getCode(item);
+      const currentQty = Number(item.quantity || 0);
+      const targetQty = Object.prototype.hasOwnProperty.call(overrides, code)
+        ? Number(overrides[code])
+        : currentQty;
+
+      if (targetQty <= 0) return;
+
+      const isOverride = Object.prototype.hasOwnProperty.call(overrides, code);
+      const alreadyHasMovement = itemsWithMovement.has(String(item.id));
+
+      if (isOverride || !alreadyHasMovement) {
+        regularizationMovements.push({
+          id: generateUuid(),
+          obraId: obraAtual.id,
+          itemId: item.id,
+          type: "entrada",
+          quantity: targetQty,
+          note: "Regularização inicial de estoque",
+          responsible: "Sistema",
+          date: getTodayISO(),
+        });
+      }
+    });
+
+    if (onlineMode && isSupabaseConfigured) {
+      if (overrideItemIds.length) {
+        const { error: deleteError } = await supabase
+          .from("stock_movements")
+          .delete()
+          .in("item_id", overrideItemIds);
+
+        if (deleteError) return setErrorMessage(deleteError.message);
+      }
+
+      if (regularizationMovements.length) {
+        const { error: insertError } = await supabase.from("stock_movements").insert(
+          regularizationMovements.map((movement) => ({
+            id: movement.id,
+            obra_id: movement.obraId,
+            item_id: movement.itemId,
+            type: movement.type,
+            quantity: movement.quantity,
+            note: movement.note,
+            responsible: movement.responsible,
+            movement_date: movement.date,
+          }))
+        );
+
+        if (insertError) return setErrorMessage(insertError.message);
+      }
+
+      await fetchAllData();
+    } else {
+      const overrideIdSet = new Set(overrideItemIds.map((id) => String(id)));
+
+      commitDataUpdate((prev) => ({
+        ...prev,
+        stockMovements: [
+          ...regularizationMovements,
+          ...(prev.stockMovements || []).filter((mv) => !overrideIdSet.has(String(mv.itemId))),
+        ],
+      }));
+    }
+
+    setLegacyCleanupFeedback(
+      `Regularização concluída: ${regularizationMovements.length} entrada(s) inicial(is) criada(s).`
+    );
+    setTimeout(() => setLegacyCleanupFeedback(""), 5000);
+  }
+
   async function saveStockMovement() {
     const qty = Number(stockMovementForm.quantity || 0);
     if (!stockMovementForm.itemId || qty <= 0) {
@@ -5612,10 +5759,11 @@ export default function App() {
       return;
     }
 
-    const currentQty = Number(currentItem.quantity || 0);
-    const nextQty = stockMovementForm.type === "entrada" ? currentQty + qty : currentQty - qty;
+    const currentQty = calculateStockBalance(currentItem.id, data.stockMovements || [], Number(currentItem.quantity || 0));
+    const movementType = normalizeStockMovementType(stockMovementForm.type);
+    const nextQty = movementType === "entrada" ? currentQty + qty : currentQty - qty;
 
-    if (stockMovementForm.type === "saida" && nextQty < 0) {
+    if (movementType === "saida" && nextQty < 0) {
       setErrorMessage("Saída maior que o saldo disponível.");
       return;
     }
@@ -5624,7 +5772,7 @@ export default function App() {
       id: generateUuid(),
       obraId,
       itemId: currentItem.id,
-      type: stockMovementForm.type,
+      type: normalizeStockMovementType(stockMovementForm.type),
       quantity: qty,
       note: stockMovementForm.note,
       responsible: normalizeResponsibleName(stockMovementForm.responsible),
@@ -5632,13 +5780,6 @@ export default function App() {
     };
 
     if (onlineMode && isSupabaseConfigured) {
-      const { error: stockError } = await supabase
-        .from("stock_items")
-        .update({ quantity: nextQty })
-        .eq("id", currentItem.id);
-
-      if (stockError) return setErrorMessage(stockError.message);
-
       const { error: movementError } = await supabase.from("stock_movements").insert({
         id: movement.id,
         obra_id: movement.obraId,
@@ -5655,13 +5796,12 @@ export default function App() {
     } else {
       commitDataUpdate((prev) => ({
         ...prev,
-        stock: prev.stock.map((item) => sameId(item.id, currentItem.id) ? { ...item, quantity: nextQty } : item),
         stockMovements: [movement, ...(prev.stockMovements || [])],
         stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
       }));
     }
 
-    const updatedItem = { ...currentItem, quantity: nextQty };
+    const updatedItem = { ...currentItem, quantity: nextQty, saldo: nextQty };
     if (selectedStockItem && sameId(selectedStockItem.id, currentItem.id)) {
       setSelectedStockItem(updatedItem);
     }
@@ -5744,7 +5884,7 @@ export default function App() {
       obraId,
       item: buildStockItemLabel(finalCode, finalDescription),
       unit: stockForm.unit,
-      quantity: Number(stockForm.quantity),
+      quantity: editingStockId ? Number((data.stock || []).find((item) => sameId(item.id, editingStockId))?.quantity ?? stockForm.quantity ?? 0) : 0,
       min: Number(stockForm.min),
       category: finalCategory,
       invoice: stockForm.invoice,
@@ -5758,6 +5898,10 @@ export default function App() {
     }
     if (onlineMode && isSupabaseConfigured) {
       if (editingStockId) {
+        const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : [editingStockId];
+        const primaryId = sourceIds[0] || editingStockId;
+        const duplicateIds = sourceIds.slice(1);
+
         const { error } = await supabase.from("stock_items").update({
           item: payload.item,
           unit: payload.unit,
@@ -5766,8 +5910,21 @@ export default function App() {
           category: payload.category,
           invoice: payload.invoice,
           price: payload.price
-        }).eq("id", editingStockId);
+        }).eq("id", primaryId);
         if (error) return setErrorMessage(error.message);
+
+        if (duplicateIds.length) {
+          const { error: duplicateError } = await supabase.from("stock_items").update({
+            item: payload.item,
+            unit: payload.unit,
+            quantity: 0,
+            min_quantity: 0,
+            category: payload.category,
+            invoice: payload.invoice,
+            price: payload.price
+          }).in("id", duplicateIds);
+          if (duplicateError) return setErrorMessage(duplicateError.message);
+        }
       } else {
         const { error } = await supabase.from("stock_items").insert({
           id: payload.id,
@@ -5785,9 +5942,28 @@ export default function App() {
       await fetchAllData();
     } else {
       if (editingStockId) {
+        const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : [editingStockId];
+        const primaryId = sourceIds[0] || editingStockId;
+        const duplicateIdSet = new Set(sourceIds.slice(1).map((value) => String(value)));
+
         commitDataUpdate((prev) => ({
           ...prev,
-          stock: prev.stock.map((item) => sameId(item.id, editingStockId) ? payload : item),
+          stock: prev.stock.map((item) => {
+            if (sameId(item.id, primaryId)) return { ...payload, id: item.id };
+            if (duplicateIdSet.has(String(item.id))) {
+              return {
+                ...item,
+                item: payload.item,
+                unit: payload.unit,
+                quantity: 0,
+                min: 0,
+                category: payload.category,
+                invoice: payload.invoice,
+                price: payload.price,
+              };
+            }
+            return item;
+          }),
           stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
         }));
       } else {
@@ -5808,6 +5984,7 @@ export default function App() {
     setStockModal(false);
     setStockEditModal(false);
     setEditingStockId("");
+    setEditingStockItemIds([]);
     setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" });
   }
 
@@ -6243,7 +6420,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} onGoToComissionamento={() => setCurrentPage("comissionamento")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
@@ -6461,7 +6638,7 @@ export default function App() {
         </div>
       </Modal>
 
-      <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); setStockCodeFeedback(""); }}>
+      <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); setEditingStockItemIds([]); setStockCodeFeedback(""); }}>
         <div className="space-y-5">
           <div className="rounded-[28px] border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-5 shadow-sm">
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
@@ -6566,7 +6743,7 @@ export default function App() {
                         {stockUnitOptions.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                       </select>
                     </Field>
-                    <Field label="Saldo inicial"><Input type="number" value={stockForm.quantity} onChange={(e) => setStockForm((prev) => ({ ...prev, quantity: e.target.value }))} /></Field>
+                    <Field label="Saldo atual"><Input type="number" value={stockForm.quantity} disabled className="bg-slate-100 text-slate-500 cursor-not-allowed" /><p className="mt-1 text-xs text-slate-500">Saldo bloqueado. Use Entrada/Saída para movimentar estoque.</p></Field>
                     <Field label="Mínimo"><Input type="number" value={stockForm.min} onChange={(e) => setStockForm((prev) => ({ ...prev, min: e.target.value }))} /></Field>
                     <Field label="Valor unitário (R$)"><Input type="number" step="0.01" value={stockForm.price} onChange={(e) => setStockForm((prev) => ({ ...prev, price: e.target.value }))} /></Field>
                   </div>
@@ -6696,7 +6873,7 @@ export default function App() {
           const displayDescription = selectedStockItem.material || parseStockItemLabel(selectedStockItem.item || "").description || selectedStockItem.item || "-";
           const targetIds = selectedStockItem.itemIds || [selectedStockItem.id];
           const itemMovements = (data.stockMovements || []).filter((mv) => targetIds.some((id) => sameId(mv.itemId, id)));
-          const displayQty = selectedStockItem.saldo ?? selectedStockItem.quantity ?? 0;
+          const displayQty = calculateStockBalance(targetIds, data.stockMovements || [], selectedStockItem.saldo ?? selectedStockItem.quantity ?? 0);
           const displayMin = selectedStockItem.min ?? 0;
           return (
             <div className="space-y-5">
@@ -6736,15 +6913,15 @@ export default function App() {
                   {itemMovements.length ? itemMovements.map((mv) => (
                     <div key={mv.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900">{mv.type === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
+                        <p className="font-medium text-slate-900">{normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
                         <p className="text-sm text-slate-500">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" className="h-8 px-3 rounded-xl text-[13px]" onClick={() => openStockMovementEditor(mv)}>
                           <FileText className="h-4 w-4" /> Editar
                         </Button>
-                        <Badge className={mv.type === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
-                          {mv.type === "entrada" ? "+" : "-"} {mv.quantity}
+                        <Badge className={normalizeStockMovementType(mv.type) === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
+                          {normalizeStockMovementType(mv.type) === "entrada" ? "+" : "-"} {mv.quantity}
                         </Badge>
                       </div>
                     </div>
