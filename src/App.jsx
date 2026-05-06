@@ -1083,6 +1083,11 @@ const STOCK_CODE_ALIAS_MAP = {
   "MC-009": "MCO-009",
   "MC-010": "MCO-010",
   "MC-011": "MCO-011",
+  "FX-001": "GER-004",
+  "FX-002": "GER-005",
+  "FX-003": "GER-006",
+  "FX-004": "GER-007",
+  "FX-005": "GER-008",
   "TI-001": "TIN-001",
   "TI-002": "TIN-002",
   "TI-003": "TIN-003",
@@ -1782,6 +1787,7 @@ function Button({ children, variant = "primary", className = "", ...props }) {
   };
   return (
     <button
+      type={props.type || "button"}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-xl border px-4 h-10 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
         styles[variant],
@@ -2166,7 +2172,7 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
+function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onEditMovement, onDeleteMovement, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
   const stockBalanceRows = buildStockBalanceRows(stock, stockMovements);
   const [reportQuery, setReportQuery] = useState("");
   const [reportCategory, setReportCategory] = useState("Todas");
@@ -2308,6 +2314,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
                         <Button variant="outline" className="h-8 px-2.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-[13px]" onClick={() => onEdit(item)}><FileText className="h-4 w-4" /> Editar</Button>
                         <Button variant="outline" className="h-8 px-2.5 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-[13px]" onClick={() => onMove(item, "entrada")}><Plus className="h-4 w-4" /> Entrada</Button>
                         <Button variant="outline" className="h-8 px-2.5 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50 text-[13px]" onClick={() => onMove(item, "saida")}><ArrowLeft className="h-4 w-4" /> Saída</Button>
+                        <Button variant="danger" className="h-8 px-2.5 rounded-xl text-[13px]" onClick={() => onDelete(item)} disabled={item.isCatalogOnly}><Trash2 className="h-4 w-4" /> Excluir</Button>
                       </div>
                       <div className="grid grid-cols-2 gap-2.5">
                         <div className="p-3 rounded-2xl bg-white border border-slate-200"><p className="text-xs text-slate-500">Saldo atual</p><p className="text-lg font-bold text-slate-900 mt-1">{item.saldo} {item.unit}</p></div>
@@ -2322,14 +2329,20 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
                         </div>
                         <div className="mt-2 space-y-2">
                           {itemMovements.slice(0, 3).map((mv) => (
-                            <div key={mv.id} className="flex items-center justify-between gap-3 text-sm">
-                              <div className="min-w-0">
-                                <p className="font-medium text-slate-800">{normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
-                                <p className="text-slate-500 truncate">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
+                            <div key={mv.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-slate-800">{normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída"} • {formatDateBR(mv.date)}</p>
+                                  <p className="text-slate-500 truncate">{mv.responsible || "-"}{mv.note ? ` • ${mv.note}` : ""}</p>
+                                </div>
+                                <Badge className={normalizeStockMovementType(mv.type) === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
+                                  {normalizeStockMovementType(mv.type) === "entrada" ? "+" : "-"} {mv.quantity}
+                                </Badge>
                               </div>
-                              <Badge className={normalizeStockMovementType(mv.type) === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>
-                                {normalizeStockMovementType(mv.type) === "entrada" ? "+" : "-"} {mv.quantity}
-                              </Badge>
+                              <div className="mt-2 flex justify-end gap-2">
+                                <Button variant="outline" className="h-7 px-2 rounded-lg text-[11px]" onClick={() => onEditMovement?.(mv)}>Editar</Button>
+                                <Button variant="danger" className="h-7 px-2 rounded-lg text-[11px]" onClick={() => onDeleteMovement?.(mv)}>Excluir</Button>
+                              </div>
                             </div>
                           ))}
                           {!itemMovements.length ? <p className="text-sm text-slate-500">Sem movimentações registradas.</p> : null}
@@ -4721,7 +4734,7 @@ export default function App() {
   const [stockMovementForm, setStockMovementForm] = useState({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
   const [stockMovementEditModal, setStockMovementEditModal] = useState(false);
   const [editingStockMovementId, setEditingStockMovementId] = useState("");
-  const [stockMovementEditForm, setStockMovementEditForm] = useState({ date: getTodayISO(), note: "", responsible: "" });
+  const [stockMovementEditForm, setStockMovementEditForm] = useState({ itemId: "", type: "entrada", quantity: 0, date: getTodayISO(), note: "", responsible: "" });
   const [stockViewModal, setStockViewModal] = useState(false);
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [stockEditModal, setStockEditModal] = useState(false);
@@ -4967,11 +4980,6 @@ export default function App() {
   }
 
   function openStockMovementModal(item, type = "entrada") {
-    const parsed = parseStockItemLabel(item?.item || "");
-    const code = item?.code || parsed.code || String(item?.id || "").replace(/^catalog-/, "");
-    const material = item?.material || parsed.description || item?.item || "";
-
-    setErrorMessage("");
     setStockMovementForm({
       itemId: item?.id || "",
       type,
@@ -4979,14 +4987,6 @@ export default function App() {
       note: "",
       responsible: "",
       date: getTodayISO(),
-      code,
-      material,
-      itemLabel: buildStockItemLabel(code, material),
-      unit: item?.unit || "un",
-      category: item?.category || "Material",
-      min: Number(item?.min || 0),
-      price: Number(item?.price || 0),
-      invoice: item?.invoice || "",
     });
     setStockMovementModal(true);
   }
@@ -5760,38 +5760,20 @@ export default function App() {
   }
 
   async function saveStockMovement() {
-    setErrorMessage("");
-
-    const qty = Number(String(stockMovementForm.quantity || "").replace(",", "."));
+    const qty = Number(stockMovementForm.quantity || 0);
     if (!stockMovementForm.itemId || qty <= 0) {
       setErrorMessage("Informe item e quantidade da movimentação.");
       return;
     }
 
+    const currentItem = (data.stock || []).find((item) => sameId(item.id, stockMovementForm.itemId));
+    if (!currentItem) {
+      setErrorMessage("Material não encontrado.");
+      return;
+    }
+
+    const currentQty = calculateStockBalance(currentItem.id, data.stockMovements || [], Number(currentItem.quantity || 0));
     const movementType = normalizeStockMovementType(stockMovementForm.type);
-    if (!['entrada', 'saida'].includes(movementType)) {
-      setErrorMessage("Tipo de movimentação inválido.");
-      return;
-    }
-
-    let currentItem = (data.stock || []).find((item) => sameId(item.id, stockMovementForm.itemId));
-    let effectiveItemId = currentItem?.id || "";
-
-    const fallbackCode = String(stockMovementForm.code || stockMovementForm.itemId || "").replace(/^catalog-/, "").trim().toUpperCase();
-    const catalogEntry = getStockCatalogEntry(fallbackCode, stockCatalogEntries) || getStockCatalogEntry(fallbackCode, STOCK_CODE_CATALOG);
-    const fallbackMaterial = String(stockMovementForm.material || catalogEntry?.description || "").trim();
-    const fallbackLabel = String(stockMovementForm.itemLabel || buildStockItemLabel(fallbackCode, fallbackMaterial)).trim();
-    const fallbackCategory = String(stockMovementForm.category || catalogEntry?.category || "Material").trim() || "Material";
-    const fallbackUnit = String(stockMovementForm.unit || "un").trim() || "un";
-
-    if (!currentItem && !fallbackLabel) {
-      setErrorMessage("Material não encontrado para movimentação.");
-      return;
-    }
-
-    const currentQty = currentItem
-      ? calculateStockBalance(currentItem.id, data.stockMovements || [], Number(currentItem.quantity || 0))
-      : 0;
     const nextQty = movementType === "entrada" ? currentQty + qty : currentQty - qty;
 
     if (movementType === "saida" && nextQty < 0) {
@@ -5799,87 +5781,18 @@ export default function App() {
       return;
     }
 
+    const movement = {
+      id: generateUuid(),
+      obraId,
+      itemId: currentItem.id,
+      type: normalizeStockMovementType(stockMovementForm.type),
+      quantity: qty,
+      note: stockMovementForm.note,
+      responsible: normalizeResponsibleName(stockMovementForm.responsible),
+      date: stockMovementForm.date || getTodayISO(),
+    };
+
     if (onlineMode && isSupabaseConfigured) {
-      if (!currentItem) {
-        const newItemId = generateId();
-        const insertPayload = {
-          id: newItemId,
-          obra_id: obraId,
-          item: fallbackLabel,
-          unit: fallbackUnit,
-          quantity: 0,
-          min_quantity: Number(stockMovementForm.min || 0),
-          category: fallbackCategory,
-          invoice: stockMovementForm.invoice || "",
-          price: Number(stockMovementForm.price || 0),
-          remarks: "",
-        };
-
-        const { data: insertedItem, error: itemInsertError } = await supabase
-          .from("stock_items")
-          .insert(insertPayload)
-          .select("*")
-          .single();
-
-        if (itemInsertError) {
-          if (String(itemInsertError.code || "") === "23505") {
-            const { data: existingItems, error: selectError } = await supabase
-              .from("stock_items")
-              .select("*")
-              .eq("obra_id", obraId)
-              .eq("item", fallbackLabel)
-              .limit(1);
-
-            if (selectError) return setErrorMessage(selectError.message);
-            currentItem = Array.isArray(existingItems) && existingItems.length ? normalizeLegacyStockItem({
-              id: existingItems[0].id,
-              obraId: existingItems[0].obra_id,
-              item: existingItems[0].item,
-              unit: existingItems[0].unit,
-              quantity: existingItems[0].quantity,
-              min: existingItems[0].min_quantity,
-              category: existingItems[0].category,
-              invoice: existingItems[0].invoice,
-              price: existingItems[0].price,
-              remarks: existingItems[0].remarks,
-            }) : null;
-            effectiveItemId = currentItem?.id || "";
-          } else {
-            return setErrorMessage(itemInsertError.message);
-          }
-        } else {
-          currentItem = normalizeLegacyStockItem({
-            id: insertedItem.id,
-            obraId: insertedItem.obra_id,
-            item: insertedItem.item,
-            unit: insertedItem.unit,
-            quantity: insertedItem.quantity,
-            min: insertedItem.min_quantity,
-            category: insertedItem.category,
-            invoice: insertedItem.invoice,
-            price: insertedItem.price,
-            remarks: insertedItem.remarks,
-          });
-          effectiveItemId = currentItem.id;
-        }
-      }
-
-      if (!effectiveItemId) {
-        setErrorMessage("Não foi possível identificar o material para salvar a movimentação.");
-        return;
-      }
-
-      const movement = {
-        id: generateUuid(),
-        obraId,
-        itemId: effectiveItemId,
-        type: movementType,
-        quantity: qty,
-        note: String(stockMovementForm.note || "").trim(),
-        responsible: normalizeResponsibleName(stockMovementForm.responsible),
-        date: stockMovementForm.date || getTodayISO(),
-      };
-
       const { error: movementError } = await supabase.from("stock_movements").insert({
         id: movement.id,
         obra_id: movement.obraId,
@@ -5892,61 +5805,17 @@ export default function App() {
       });
 
       if (movementError) return setErrorMessage(movementError.message);
-
-      // Mantém o cache quantity coerente, mas a tela continua calculando o saldo pelas movimentações.
-      await supabase
-        .from("stock_items")
-        .update({ quantity: nextQty })
-        .eq("id", effectiveItemId);
-
-      setStockMovementModal(false);
-      setStockMovementForm({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
       await fetchAllData();
-      return;
-    }
-
-    // Modo local/offline: se o item ainda for apenas do catálogo, cadastra antes de movimentar.
-    if (!currentItem) {
-      currentItem = normalizeLegacyStockItem({
-        id: generateId(),
-        obraId,
-        item: fallbackLabel,
-        unit: fallbackUnit,
-        quantity: 0,
-        min: Number(stockMovementForm.min || 0),
-        category: fallbackCategory,
-        invoice: stockMovementForm.invoice || "",
-        price: Number(stockMovementForm.price || 0),
-        remarks: "",
-      });
-      effectiveItemId = currentItem.id;
-    }
-
-    const movement = {
-      id: generateUuid(),
-      obraId,
-      itemId: effectiveItemId,
-      type: movementType,
-      quantity: qty,
-      note: String(stockMovementForm.note || "").trim(),
-      responsible: normalizeResponsibleName(stockMovementForm.responsible),
-      date: stockMovementForm.date || getTodayISO(),
-    };
-
-    commitDataUpdate((prev) => {
-      const alreadyExists = (prev.stock || []).some((item) => sameId(item.id, effectiveItemId));
-      return {
+    } else {
+      commitDataUpdate((prev) => ({
         ...prev,
-        stock: alreadyExists
-          ? (prev.stock || []).map((item) => sameId(item.id, effectiveItemId) ? { ...item, quantity: nextQty } : item)
-          : [currentItem, ...(prev.stock || [])],
         stockMovements: [movement, ...(prev.stockMovements || [])],
         stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
-      };
-    });
+      }));
+    }
 
     const updatedItem = { ...currentItem, quantity: nextQty, saldo: nextQty };
-    if (selectedStockItem && sameId(selectedStockItem.id, effectiveItemId)) {
+    if (selectedStockItem && sameId(selectedStockItem.id, currentItem.id)) {
       setSelectedStockItem(updatedItem);
     }
     setStockMovementModal(false);
@@ -5957,6 +5826,9 @@ export default function App() {
     if (!movement) return;
     setEditingStockMovementId(movement.id || "");
     setStockMovementEditForm({
+      itemId: movement.itemId || "",
+      type: normalizeStockMovementType(movement.type) || "entrada",
+      quantity: Number(movement.quantity || 0),
       date: movement.date || getTodayISO(),
       note: movement.note || "",
       responsible: movement.responsible || "",
@@ -5970,7 +5842,32 @@ export default function App() {
       return;
     }
 
+    const movementBefore = (data.stockMovements || []).find((mv) => sameId(mv.id, editingStockMovementId));
+    if (!movementBefore) {
+      setErrorMessage("Movimentação não encontrada.");
+      return;
+    }
+
+    const nextType = normalizeStockMovementType(stockMovementEditForm.type) || "entrada";
+    const nextQty = Number(stockMovementEditForm.quantity || 0);
+    if (!nextQty || nextQty <= 0) {
+      setErrorMessage("Informe uma quantidade válida para a movimentação.");
+      return;
+    }
+
+    const itemId = movementBefore.itemId || stockMovementEditForm.itemId;
+    const movementsWithoutCurrent = (data.stockMovements || []).filter((mv) => !sameId(mv.id, editingStockMovementId));
+    const balanceWithoutCurrent = calculateStockBalance(itemId, movementsWithoutCurrent, 0);
+    const balanceAfterEdit = nextType === "entrada" ? balanceWithoutCurrent + nextQty : balanceWithoutCurrent - nextQty;
+
+    if (nextType === "saida" && balanceAfterEdit < 0) {
+      setErrorMessage("A edição geraria saldo negativo para este material.");
+      return;
+    }
+
     const payload = {
+      type: nextType,
+      quantity: nextQty,
       note: String(stockMovementEditForm.note || "").trim(),
       responsible: normalizeResponsibleName(stockMovementEditForm.responsible),
       date: stockMovementEditForm.date || getTodayISO(),
@@ -5980,6 +5877,8 @@ export default function App() {
       const { error } = await supabase
         .from("stock_movements")
         .update({
+          type: payload.type,
+          quantity: payload.quantity,
           note: payload.note,
           responsible: payload.responsible,
           movement_date: payload.date,
@@ -5987,22 +5886,64 @@ export default function App() {
         .eq("id", editingStockMovementId);
 
       if (error) return setErrorMessage(error.message);
+
+      await supabase
+        .from("stock_items")
+        .update({ quantity: balanceAfterEdit })
+        .eq("id", itemId);
+
       await fetchAllData();
     } else {
       commitDataUpdate((prev) => ({
         ...prev,
+        stock: (prev.stock || []).map((item) => sameId(item.id, itemId) ? { ...item, quantity: balanceAfterEdit, saldo: balanceAfterEdit } : item),
         stockMovements: (prev.stockMovements || []).map((mv) =>
           sameId(mv.id, editingStockMovementId)
-            ? { ...mv, note: payload.note, responsible: payload.responsible, date: payload.date }
+            ? { ...mv, type: payload.type, quantity: payload.quantity, note: payload.note, responsible: payload.responsible, date: payload.date }
             : mv
         ),
         stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(payload.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
       }));
     }
 
+    if (selectedStockItem && sameId(selectedStockItem.id, itemId)) {
+      setSelectedStockItem((prev) => prev ? { ...prev, quantity: balanceAfterEdit, saldo: balanceAfterEdit } : prev);
+    }
     setStockMovementEditModal(false);
     setEditingStockMovementId("");
-    setStockMovementEditForm({ date: getTodayISO(), note: "", responsible: "" });
+    setStockMovementEditForm({ itemId: "", type: "entrada", quantity: 0, date: getTodayISO(), note: "", responsible: "" });
+  }
+
+  async function deleteStockMovement(movement) {
+    if (!movement?.id) return;
+    const confirmed = window.confirm("Deseja realmente excluir esta movimentação? O saldo será recalculado pelo histórico restante.");
+    if (!confirmed) return;
+
+    const itemId = movement.itemId;
+    const remainingMovements = (data.stockMovements || []).filter((mv) => !sameId(mv.id, movement.id));
+    const nextBalance = calculateStockBalance(itemId, remainingMovements, 0);
+
+    if (onlineMode && isSupabaseConfigured) {
+      const { error } = await supabase.from("stock_movements").delete().eq("id", movement.id);
+      if (error) return setErrorMessage(error.message);
+
+      await supabase
+        .from("stock_items")
+        .update({ quantity: nextBalance })
+        .eq("id", itemId);
+
+      await fetchAllData();
+    } else {
+      commitDataUpdate((prev) => ({
+        ...prev,
+        stock: (prev.stock || []).map((item) => sameId(item.id, itemId) ? { ...item, quantity: nextBalance, saldo: nextBalance } : item),
+        stockMovements: (prev.stockMovements || []).filter((mv) => !sameId(mv.id, movement.id)),
+      }));
+    }
+
+    if (selectedStockItem && sameId(selectedStockItem.id, itemId)) {
+      setSelectedStockItem((prev) => prev ? { ...prev, quantity: nextBalance, saldo: nextBalance } : prev);
+    }
   }
 
   async function addStockItem() {
@@ -6415,13 +6356,54 @@ export default function App() {
     }
   }
 
-  async function deleteStockItem(id) {
+  async function deleteStockItem(itemOrId) {
+    const ids = Array.isArray(itemOrId?.itemIds) && itemOrId.itemIds.length
+      ? itemOrId.itemIds
+      : [itemOrId?.id ?? itemOrId].filter((value) => value !== undefined && value !== null && String(value) !== "");
+
+    if (!ids.length) {
+      setErrorMessage("Material não encontrado para exclusão.");
+      return;
+    }
+
+    const relatedMovements = (data.stockMovements || []).filter((mv) => ids.some((id) => sameId(id, mv.itemId)));
+    const label = itemOrId?.material || itemOrId?.item || "este material";
+    const confirmed = window.confirm(
+      relatedMovements.length
+        ? `Deseja realmente excluir ${label}? Esta ação também removerá ${relatedMovements.length} movimentação(ões) vinculada(s).`
+        : `Deseja realmente excluir ${label}?`
+    );
+    if (!confirmed) return;
+
+    const previousScrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    const restoreScrollPosition = () => {
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => window.scrollTo({ top: previousScrollY, left: 0, behavior: "auto" }));
+      }
+    };
+
     if (onlineMode && isSupabaseConfigured) {
-      const { error } = await supabase.from("stock_items").delete().eq("id", id);
+      if (relatedMovements.length) {
+        const { error: movementError } = await supabase.from("stock_movements").delete().in("item_id", ids);
+        if (movementError) return setErrorMessage(movementError.message);
+      }
+
+      const { error } = await supabase.from("stock_items").delete().in("id", ids);
       if (error) return setErrorMessage(error.message);
       await fetchAllData();
+      restoreScrollPosition();
     } else {
-      setData((prev) => ({ ...prev, stock: prev.stock.filter((item) => item.id !== id) }));
+      commitDataUpdate((prev) => ({
+        ...prev,
+        stock: (prev.stock || []).filter((item) => !ids.some((id) => sameId(id, item.id))),
+        stockMovements: (prev.stockMovements || []).filter((mv) => !ids.some((id) => sameId(id, mv.itemId))),
+      }));
+      restoreScrollPosition();
+    }
+
+    if (selectedStockItem && ids.some((id) => sameId(id, selectedStockItem.id))) {
+      setSelectedStockItem(null);
+      setStockViewModal(false);
     }
   }
 
@@ -6564,7 +6546,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} onGoToComissionamento={() => setCurrentPage("comissionamento")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
@@ -7094,12 +7076,18 @@ export default function App() {
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setStockMovementModal(false)}>Cancelar</Button>
-          <Button type="button" onClick={saveStockMovement}>Salvar movimentação</Button>
+          <Button onClick={saveStockMovement}>Salvar movimentação</Button>
         </div>
       </Modal>
 
-      <Modal open={stockMovementEditModal} title="Editar justificativa da movimentação" onClose={() => setStockMovementEditModal(false)}>
+      <Modal open={stockMovementEditModal} title="Editar movimentação" onClose={() => setStockMovementEditModal(false)}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Tipo">
+            <SelectField value={stockMovementEditForm.type} onChange={(value) => setStockMovementEditForm((prev) => ({ ...prev, type: value }))} options={[{ value: "entrada", label: "Entrada" }, { value: "saida", label: "Saída" }]} />
+          </Field>
+          <Field label="Quantidade">
+            <Input type="number" min="0" step="0.1" value={stockMovementEditForm.quantity} onChange={(e) => setStockMovementEditForm((prev) => ({ ...prev, quantity: e.target.value }))} />
+          </Field>
           <Field label="Data">
             <Input type="date" value={stockMovementEditForm.date} onChange={(e) => setStockMovementEditForm((prev) => ({ ...prev, date: e.target.value }))} />
           </Field>
@@ -7114,7 +7102,7 @@ export default function App() {
           {stockResponsibleOptions.map((name) => <option key={name} value={name} />)}
         </datalist>
         <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
-          Aqui você ajusta a justificativa, o responsável e a data da movimentação, sem alterar o saldo do item.
+          Ajuste o tipo, a quantidade, a data e a justificativa. O saldo será recalculado automaticamente pelo histórico.
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setStockMovementEditModal(false)}>Cancelar</Button>
