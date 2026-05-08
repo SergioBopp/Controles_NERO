@@ -1162,6 +1162,33 @@ const STOCK_CODE_CATALOG_BY_CODE = Object.fromEntries(
 );
 
 
+const STOCK_CATEGORY_BY_PREFIX = Object.fromEntries(
+  (STOCK_CODE_CATALOG || [])
+    .map((entry) => [String(entry.prefix || extractStockGroupCode(entry.category) || "").trim().toUpperCase(), String(entry.category || "").trim()])
+    .filter(([prefix, category]) => /^[A-Z]{3}$/.test(prefix) && category)
+);
+
+function isGenericStockCategory(category) {
+  const normalized = String(category || "").trim().toLowerCase();
+  return !normalized || normalized === "material" || normalized === "materiais" || normalized === "materiais (mat)" || normalized === "material (mat)";
+}
+
+function inferStockCategoryFromCode(code, fallbackCategory = "Material") {
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  const prefix = normalizedCode.match(/^([A-Z]{3})-\d{3}$/)?.[1] || "";
+  const fallback = String(fallbackCategory || "").trim() || "Material";
+
+  if (!prefix) return fallback;
+  const inferredCategory = STOCK_CATEGORY_BY_PREFIX[prefix];
+
+  if (inferredCategory && isGenericStockCategory(fallback)) {
+    return inferredCategory;
+  }
+
+  return fallback;
+}
+
+
 
 const MAINTENANCE_AREAS = [
   "Sede Salvador",
@@ -1265,7 +1292,7 @@ function normalizeElectricalAlias(code, description) {
 function canonicalizeStockEntry(code, description, category) {
   const normalizedCode = String(code || "").trim().toUpperCase();
   const cleanedDescription = stripLeadingCodeFromDescription(description);
-  const cleanedCategory = String(category || "").trim() || "Material";
+  const cleanedCategory = inferStockCategoryFromCode(normalizedCode, category);
 
   const electrical = normalizeElectricalAlias(normalizedCode, cleanedDescription);
   if (electrical) return electrical;
@@ -6048,10 +6075,12 @@ export default function App() {
   async function addStockItem() {
     const entry = getStockCatalogEntry(stockForm.code, stockCatalogEntries);
     const normalizedInputDescription = String(stockForm.item || "").trim() || entry?.description || "";
+    const selectedCategory = String(stockForm.category || "").trim();
+    const preferredCategory = selectedCategory || entry?.category || "Material";
     const canonical = canonicalizeStockEntry(
       entry?.code || stockForm.code,
       normalizedInputDescription,
-      entry?.category || stockForm.category || "Material"
+      preferredCategory
     );
     const originalInputCode = String(stockForm.code || "").trim().toUpperCase();
     const finalCode = canonical.code || originalInputCode;
