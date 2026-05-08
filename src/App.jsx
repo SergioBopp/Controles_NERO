@@ -3095,6 +3095,31 @@ function addPageNumbers(doc) {
   }
 }
 
+function downloadPdfDirect(doc, filename) {
+  const safeFilename = String(filename || "relatorio.pdf")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "relatorio.pdf";
+
+  try {
+    const blob = doc.output("blob");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = safeFilename.toLowerCase().endsWith(".pdf") ? safeFilename : `${safeFilename}.pdf`;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (error) {
+    console.error("Falha no download direto do PDF:", error);
+    doc.save(safeFilename);
+  }
+}
+
 
 function normalizeStockMovementType(type) {
   const value = String(type || "").trim().toLowerCase();
@@ -3288,7 +3313,7 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
   doc.setTextColor(0, 0, 0);
 
   addPageNumbers(doc);
-  doc.save(`relatorio-posicao-estoque-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+  downloadPdfDirect(doc, `relatorio-posicao-estoque-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
 }
 
 
@@ -3381,7 +3406,7 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual, se
   });
 
   addPageNumbers(doc);
-  doc.save(`relatorio-movimentacoes-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+  downloadPdfDirect(doc, `relatorio-movimentacoes-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
 }
 
 async function exportDailyPdf(day, companies, roles, obraNome) {
