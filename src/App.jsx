@@ -3207,6 +3207,7 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const generatedAt = getDateTimeBRNoSeconds();
   const rows = buildStockBalanceRows(stockItems, stockMovements);
+  const totalStockValue = rows.reduce((acc, row) => acc + Number(row.saldo || 0) * Number(row.price || 0), 0);
 
   const drawHeader = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -3232,20 +3233,26 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
     margin: { top: 44, left: 14, right: 14 },
     tableWidth: "auto",
     rowPageBreak: "avoid",
-    head: [["CÓDIGO", "MATERIAL", "ENTRADA", "SAÍDA", "SALDO"]],
+    head: [["CÓDIGO", "DESCRIÇÃO DO MATERIAL", "ENTRADA", "SAÍDA", "SALDO", "VALOR UNIT.", "VALOR TOTAL"]],
     body: rows.length
-      ? rows.map((row) => [
-          row.code,
-          row.material,
-          `${row.entrada} ${row.unit}`,
-          `${row.saida} ${row.unit}`,
-          `${row.saldo} ${row.unit}`,
-        ])
-      : [["-", "Sem materiais cadastrados", "-", "-", "-"]],
+      ? rows.map((row) => {
+          const unitPrice = Number(row.price || 0);
+          const rowValue = Number(row.saldo || 0) * unitPrice;
+          return [
+            row.code,
+            row.material,
+            `${formatNumberBR(row.entrada)} ${row.unit}`,
+            `${formatNumberBR(row.saida)} ${row.unit}`,
+            `${formatNumberBR(row.saldo)} ${row.unit}`,
+            formatCurrencyBR(unitPrice),
+            formatCurrencyBR(rowValue),
+          ];
+        })
+      : [["-", "Sem materiais cadastrados", "-", "-", "-", "-", "-"]],
     theme: "grid",
     styles: {
       font: "helvetica",
-      fontSize: 8,
+      fontSize: 7.6,
       cellPadding: 2,
       overflow: "linebreak",
       valign: "middle",
@@ -3257,14 +3264,28 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
       halign: "center",
     },
     columnStyles: {
-      0: { cellWidth: 28, halign: "center" },
-      1: { cellWidth: 140 },
-      2: { cellWidth: 28, halign: "center" },
-      3: { cellWidth: 28, halign: "center" },
-      4: { cellWidth: 28, halign: "center" },
+      0: { cellWidth: 24, halign: "center" },
+      1: { cellWidth: 96 },
+      2: { cellWidth: 25, halign: "center" },
+      3: { cellWidth: 25, halign: "center" },
+      4: { cellWidth: 25, halign: "center" },
+      5: { cellWidth: 31, halign: "right" },
+      6: { cellWidth: 35, halign: "right" },
     },
     didDrawPage: drawHeader,
   });
+
+  const tableEndY = doc.lastAutoTable?.finalY || 44;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const totalRowY = Math.min(tableEndY + 4, doc.internal.pageSize.getHeight() - 24);
+  doc.setFillColor(15, 118, 110);
+  doc.rect(14, totalRowY, pageWidth - 28, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text("TOTAL GERAL DO ESTOQUE", pageWidth - 82, totalRowY + 4, { align: "right" });
+  doc.text(formatCurrencyBR(totalStockValue), pageWidth - 16, totalRowY + 6, { align: "right" });
+  doc.setTextColor(0, 0, 0);
 
   addPageNumbers(doc);
   doc.save(`relatorio-posicao-estoque-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
