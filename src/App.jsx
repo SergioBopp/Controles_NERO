@@ -1235,6 +1235,19 @@ function formatCurrencyBR(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
 }
 
+function parseNumberBR(value, fallback = 0) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  const cleaned = raw
+    .replace(/R\$|\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+    .replace(/[^0-9.-]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function formatNumberBR(value, options = {}) {
   return new Intl.NumberFormat("pt-BR", options).format(Number(value || 0));
 }
@@ -4453,12 +4466,17 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
     e.preventDefault();
     if (!semanaAtiva) return setError("Crie ou selecione uma semana primeiro.");
     if (semanaFechada) return setError("A semana está fechada.");
-    if (!form.nome.trim() || !form.cargo.trim() || !Number(form.diaria || 0) || !form.pixTipo || !form.pix.trim()) return setError("Preencha nome, cargo, diária e a chave PIX.");
+    const diariaValor = parseNumberBR(form.diaria);
+    const diaValor = parseNumberBR(form.dia);
+    const noiteValor = parseNumberBR(form.noite);
+    const sabadoValor = parseNumberBR(form.sabado);
+    const domingoFeriadoValor = parseNumberBR(form.domingoFeriado);
+    if (!form.nome.trim() || !form.cargo.trim() || !diariaValor || !form.pix.trim()) return setError("Preencha nome, cargo, diária e a chave PIX.");
     if (String(form.cpf || "").replace(/\D/g, "").length !== 11) return setError("Informe um CPF válido.");
-    if ([form.dia, form.noite, form.sabado, form.domingoFeriado].every((n) => Number(n || 0) === 0)) return setError("Informe ao menos uma diária.");
+    if ([diaValor, noiteValor, sabadoValor, domingoFeriadoValor].every((n) => Number(n || 0) === 0)) return setError("Informe ao menos uma diária.");
     setSaving(true); setError("");
     try {
-      await diariasSaveLancamento({ semana_id: semanaAtiva.id, nome: form.nome.trim(), cargo: form.cargo.trim(), diaria: Number(form.diaria || 0), cpf: form.cpf, pix: form.pix.trim(), dia: Number(form.dia || 0), noite: Number(form.noite || 0), sabado: Number(form.sabado || 0), domingo_feriado: Number(form.domingoFeriado || 0) });
+      await diariasSaveLancamento({ semana_id: semanaAtiva.id, nome: form.nome.trim(), cargo: form.cargo.trim(), diaria: diariaValor, cpf: form.cpf, pix: form.pix.trim(), dia: diaValor, noite: noiteValor, sabado: sabadoValor, domingo_feriado: domingoFeriadoValor });
       setForm((prev) => ({ ...prev, nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 }));
       await recarregarBase(semanaAtivaId);
     } catch (err) {
@@ -4678,7 +4696,7 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
                     <Field label="Sábado"><Input type="number" min="0" value={form.sabado} onChange={(e) => setForm((prev) => ({ ...prev, sabado: e.target.value }))} disabled={semanaFechada} /></Field>
                     <Field label="Dom/Feriado"><Input type="number" min="0" value={form.domingoFeriado} onChange={(e) => setForm((prev) => ({ ...prev, domingoFeriado: e.target.value }))} disabled={semanaFechada} /></Field>
                   </div>
-                  <div className="flex justify-end"><Button disabled={saving || semanaFechada}>{saving ? "Salvando..." : "Adicionar lançamento"}</Button></div>
+                  <div className="flex justify-end"><Button type="submit" disabled={saving || semanaFechada}>{saving ? "Salvando..." : "Adicionar lançamento"}</Button></div>
                 </form>
               </div>
             </Card>
@@ -6133,21 +6151,27 @@ export default function App() {
     const finalDescription = String(canonical.description || "").trim();
     const finalCategory = String(canonical.category || "Material").trim() || "Material";
     const requiredPrefix = extractStockGroupCode(finalCategory);
+    const isCatalogEditing = String(editingStockId || "").startsWith("catalog-") || (!editingStockId && stockEditModal);
+    const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : (editingStockId && !isCatalogEditing ? [editingStockId] : []);
 
     if (requiredPrefix && !/^[A-Z]{3}-\d{3}$/.test(finalCode)) {
       return setErrorMessage(`O código do material deve seguir o padrão ${requiredPrefix}-000.`);
     }
 
+    const existingLocal = editingStockId && !isCatalogEditing
+      ? (data.stock || []).find((item) => sameId(item.id, editingStockId))
+      : null;
+
     const payload = {
-      id: editingStockId || generateId(),
+      id: editingStockId && !isCatalogEditing ? editingStockId : generateId(),
       obraId,
       item: buildStockItemLabel(finalCode, finalDescription),
       unit: stockForm.unit,
-      quantity: editingStockId ? Number((data.stock || []).find((item) => sameId(item.id, editingStockId))?.quantity ?? stockForm.quantity ?? 0) : 0,
-      min: Number(stockForm.min),
+      quantity: editingStockId && !isCatalogEditing ? Number(existingLocal?.quantity ?? stockForm.quantity ?? 0) : 0,
+      min: parseNumberBR(stockForm.min),
       category: finalCategory,
       invoice: stockForm.invoice,
-      price: Number(stockForm.price),
+      price: parseNumberBR(stockForm.price),
       remarks: String(stockForm.remarks || "").trim(),
     };
 
@@ -6155,53 +6179,67 @@ export default function App() {
     if (originalInputCode && originalInputCode !== finalCode) {
       setStockCodeFeedback(`Código antigo convertido automaticamente para ${finalCode}.`);
     }
+
+    setErrorMessage("");
+
     if (onlineMode && isSupabaseConfigured) {
-      if (editingStockId) {
-        const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : [editingStockId];
+      const dbPayload = {
+        item: payload.item,
+        unit: payload.unit,
+        quantity: payload.quantity,
+        min_quantity: payload.min,
+        category: payload.category,
+        invoice: payload.invoice,
+        price: payload.price,
+        remarks: payload.remarks,
+      };
+
+      if (editingStockId && !isCatalogEditing) {
         const primaryId = sourceIds[0] || editingStockId;
         const duplicateIds = sourceIds.slice(1);
 
-        const { error } = await supabase.from("stock_items").update({
-          item: payload.item,
-          unit: payload.unit,
-          quantity: payload.quantity,
-          min_quantity: payload.min,
-          category: payload.category,
-          invoice: payload.invoice,
-          price: payload.price
-        }).eq("id", primaryId);
+        const { error } = await supabase
+          .from("stock_items")
+          .update(dbPayload)
+          .eq("id", primaryId);
         if (error) return setErrorMessage(error.message);
 
         if (duplicateIds.length) {
           const { error: duplicateError } = await supabase.from("stock_items").update({
-            item: payload.item,
-            unit: payload.unit,
+            ...dbPayload,
             quantity: 0,
             min_quantity: 0,
-            category: payload.category,
-            invoice: payload.invoice,
-            price: payload.price
           }).in("id", duplicateIds);
           if (duplicateError) return setErrorMessage(duplicateError.message);
         }
       } else {
-        const { error } = await supabase.from("stock_items").insert({
-          id: payload.id,
-          obra_id: payload.obraId,
-          item: payload.item,
-          unit: payload.unit,
-          quantity: payload.quantity,
-          min_quantity: payload.min,
-          category: payload.category,
-          invoice: payload.invoice,
-          price: payload.price
-        });
-        if (error) return setErrorMessage(error.message);
+        const { data: existingRows, error: findError } = await supabase
+          .from("stock_items")
+          .select("id")
+          .eq("obra_id", payload.obraId)
+          .eq("item", payload.item)
+          .limit(1);
+        if (findError) return setErrorMessage(findError.message);
+
+        const existingId = existingRows?.[0]?.id;
+        if (existingId) {
+          const { error: updateExistingError } = await supabase
+            .from("stock_items")
+            .update(dbPayload)
+            .eq("id", existingId);
+          if (updateExistingError) return setErrorMessage(updateExistingError.message);
+        } else {
+          const { error: insertError } = await supabase.from("stock_items").insert({
+            id: payload.id,
+            obra_id: payload.obraId,
+            ...dbPayload,
+          });
+          if (insertError) return setErrorMessage(insertError.message);
+        }
       }
       await fetchAllData();
     } else {
-      if (editingStockId) {
-        const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : [editingStockId];
+      if (editingStockId && !isCatalogEditing) {
         const primaryId = sourceIds[0] || editingStockId;
         const duplicateIdSet = new Set(sourceIds.slice(1).map((value) => String(value)));
 
@@ -6219,6 +6257,7 @@ export default function App() {
                 category: payload.category,
                 invoice: payload.invoice,
                 price: payload.price,
+                remarks: payload.remarks,
               };
             }
             return item;
@@ -6226,11 +6265,21 @@ export default function App() {
           stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
         }));
       } else {
-        commitDataUpdate((prev) => ({
-          ...prev,
-          stock: [...prev.stock, payload],
-          stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
-        }));
+        commitDataUpdate((prev) => {
+          const existing = (prev.stock || []).find((item) => sameId(item.obraId, payload.obraId) && String(item.item || "") === payload.item);
+          if (existing) {
+            return {
+              ...prev,
+              stock: prev.stock.map((item) => sameId(item.id, existing.id) ? { ...item, ...payload, id: item.id } : item),
+              stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
+            };
+          }
+          return {
+            ...prev,
+            stock: [...prev.stock, payload],
+            stockCategories: Array.from(new Set([...(prev.stockCategories || []), payload.category])).filter(Boolean),
+          };
+        });
       }
     }
     if (finalCategory) {
@@ -6246,7 +6295,6 @@ export default function App() {
     setEditingStockItemIds([]);
     setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" });
   }
-
 
   function addStockCategory() {
     const normalized = normalizeStockGroupCode(stockNewCategory);
@@ -7045,7 +7093,7 @@ export default function App() {
                     </Field>
                     <Field label="Saldo atual"><Input type="number" value={stockForm.quantity} disabled className="bg-slate-100 text-slate-500 cursor-not-allowed" /><p className="mt-1 text-xs text-slate-500">Saldo bloqueado. Use Entrada/Saída para movimentar estoque.</p></Field>
                     <Field label="Mínimo"><Input type="number" value={stockForm.min} onChange={(e) => setStockForm((prev) => ({ ...prev, min: e.target.value }))} /></Field>
-                    <Field label="Valor unitário (R$)"><Input type="number" step="0.01" value={stockForm.price} onChange={(e) => setStockForm((prev) => ({ ...prev, price: e.target.value }))} /></Field>
+                    <Field label="Valor unitário (R$)"><Input type="text" inputMode="decimal" value={stockForm.price} onChange={(e) => setStockForm((prev) => ({ ...prev, price: e.target.value }))} /></Field>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
