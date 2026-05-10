@@ -167,6 +167,37 @@ function ComissionamentoApp() {
     };
   }, [obras, sistemas, checklist, pendencias]);
 
+  const slaExecutive = useMemo(() => {
+    const hoje = new Date();
+
+    const pendenciasComPrazo = pendencias.map((p) => {
+      const prazo = p.prazo ? new Date(p.prazo) : null;
+
+      let situacao = "Sem prazo";
+
+      if (prazo) {
+        const diff = Math.ceil((prazo - hoje) / (1000 * 60 * 60 * 24));
+
+        if (diff < 0) situacao = "Atrasada";
+        else if (diff <= 3) situacao = "Em risco";
+        else situacao = "No prazo";
+      }
+
+      return {
+        ...p,
+        situacao,
+      };
+    });
+
+    return {
+      atrasadas: pendenciasComPrazo.filter((p) => p.situacao === "Atrasada").length,
+      risco: pendenciasComPrazo.filter((p) => p.situacao === "Em risco").length,
+      prazo: pendenciasComPrazo.filter((p) => p.situacao === "No prazo").length,
+    };
+  }, [pendencias]);
+
+
+
   async function carregarDados() {
     setLoading(true);
     setFeedback("");
@@ -805,6 +836,157 @@ function ComissionamentoApp() {
                 ))}
               </section>
 
+
+              
+              <section className="page-card executive-dashboard-v12">
+                <div className="executive-head">
+                  <div>
+                    <span className="painel-title">SLA Executivo</span>
+                    <h2>Prazos e criticidade operacional</h2>
+                    <p>Monitoramento executivo de vencimentos e riscos das pendências.</p>
+                  </div>
+
+                  <div className="executive-score">
+                    <strong>{slaExecutive.atrasadas}</strong>
+                    <span>atrasadas</span>
+                  </div>
+                </div>
+
+                <div className="quick-grid">
+                  <div>
+                    <strong>{slaExecutive.prazo}</strong>
+                    <span>No prazo</span>
+                  </div>
+
+                  <div>
+                    <strong>{slaExecutive.risco}</strong>
+                    <span>Em risco</span>
+                  </div>
+
+                  <div>
+                    <strong>{slaExecutive.atrasadas}</strong>
+                    <span>Atrasadas</span>
+                  </div>
+                </div>
+
+                <div className="painel" style={{ marginTop: "18px" }}>
+                  <h2>Leitura SLA</h2>
+
+                  <p>
+                    {slaExecutive.atrasadas > 0
+                      ? "Pendências críticas vencidas impactando o avanço operacional."
+                      : "Nenhuma pendência vencida detectada."}
+                  </p>
+                </div>
+              </section>
+
+
+
+<section className="page-card executive-dashboard-v11">
+                <div className="executive-head">
+                  <div>
+                    <span className="painel-title">Dashboard Executivo</span>
+                    <h2>Comissionamento</h2>
+                    <p>Visão gerencial consolidada das disciplinas, pendências e performance operacional.</p>
+                  </div>
+
+                  <div className="executive-score">
+                    <strong>{executive.progresso}%</strong>
+                    <span>conclusão geral</span>
+                  </div>
+                </div>
+
+                <div className="quick-grid">
+                  <div>
+                    <strong>{executive.ok}</strong>
+                    <span>Itens OK</span>
+                  </div>
+
+                  <div>
+                    <strong>{executive.pendente}</strong>
+                    <span>Pendentes</span>
+                  </div>
+
+                  <div>
+                    <strong>{executive.naoConforme}</strong>
+                    <span>Não conformes</span>
+                  </div>
+
+                  <div>
+                    <strong>{pendencias.length}</strong>
+                    <span>Total pendências</span>
+                  </div>
+                </div>
+
+                <div className="table-wrap executive-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Disciplina</th>
+                        <th>Obra</th>
+                        <th>Total</th>
+                        <th>OK</th>
+                        <th>NC</th>
+                        <th>Performance</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {executive.sistemasResumo
+                        .sort((a, b) => b.nc - a.nc)
+                        .slice(0, 6)
+                        .map((linha) => (
+                          <tr key={linha.id}>
+                            <td>{linha.nome}</td>
+                            <td>{linha.obra}</td>
+                            <td>{linha.total}</td>
+                            <td>{linha.ok}</td>
+                            <td>{linha.nc}</td>
+                            <td>
+                              <div className="mini-progress">
+                                <span>{linha.percentual}%</span>
+                                <div>
+                                  <i style={{ width: `${linha.percentual}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="painel" style={{ marginTop: "18px" }}>
+                  <h2>Leitura Executiva</h2>
+
+                  <p>
+                    {executive.naoConforme > 0
+                      ? "Não conformidades impactando o avanço operacional."
+                      : "Operação estabilizada sem não conformidades relevantes."}
+                  </p>
+
+                  <div className="quick-grid">
+                    <div>
+                      <strong>Disciplina crítica</strong>
+                      <span>
+                        {executive.sistemasResumo.sort((a, b) => b.nc - a.nc)[0]?.nome || "-"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <strong>Pendências abertas</strong>
+                      <span>{executive.pendenciasAbertas}</span>
+                    </div>
+
+                    <div>
+                      <strong>Pendências resolvidas</strong>
+                      <span>{executive.pendenciasResolvidas}</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+
               <section className="painel">
                 <h2>Comissionamento</h2>
                 <p>
@@ -1290,8 +1472,24 @@ function ComissionamentoApp() {
                         </div>
 
                         <div className="pendencia-field">
+                          <span>Prazo</span>
+                          <input
+                            type="date"
+                            className="evidence-input responsavel-input"
+                            defaultValue={pendencia.prazo || ""}
+                            onBlur={(e) => atualizarPendencia(pendencia.id, "prazo", e.target.value)}
+                          />
+                        </div>
+
+                        <div className="pendencia-field">
                           <span>Status</span>
-                          <span className={`badge ${pendencia.status === "Resolvida" ? "ok" : pendencia.status === "Em andamento" ? "warn" : "bad"}`}>
+                          <span className={`badge ${
+                            pendencia.status === "Resolvida"
+                              ? "ok"
+                              : pendencia.status === "Em andamento"
+                              ? "warn"
+                              : "bad"
+                          }`}>
                             {pendencia.status || "Aberta"}
                           </span>
                         </div>
@@ -1307,6 +1505,14 @@ function ComissionamentoApp() {
                             </button>
                             <button type="button" className="mini-action ok" onClick={() => atualizarPendencia(pendencia.id, "status", "Resolvida")}>
                               Resolvida
+                            </button>
+                            <button
+                              type="button"
+                              className="mini-action bad"
+                              title="Excluir pendência"
+                              onClick={() => excluirPendenciaComUndo(pendencia)}
+                            >
+                              Excluir
                             </button>
                           </div>
                         </div>

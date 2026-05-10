@@ -1298,6 +1298,16 @@ function formatNumberBR(value, options = {}) {
   return new Intl.NumberFormat("pt-BR", options).format(Number(value || 0));
 }
 
+function formatQuantity(value, options = {}) {
+  const numericValue = parseNumberBR(value, 0);
+  const hasDecimal = Math.abs(numericValue % 1) > 0.000001;
+  return formatNumberBR(numericValue, {
+    minimumFractionDigits: hasDecimal ? 1 : 0,
+    maximumFractionDigits: 2,
+    ...options,
+  });
+}
+
 function formatPercentBR(value, digits = 2) {
   return `${formatNumberBR(value, { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 }
@@ -2254,13 +2264,341 @@ function getMaintenanceSortWeight(item) {
   return 4;
 }
 
+function daysSinceDate(dateValue) {
+  if (!dateValue) return null;
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const today = new Date(`${getTodayISO()}T00:00:00`);
+  return Math.floor((today.getTime() - parsed.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getLastMovementDateForStockRow(row, stockMovements = []) {
+  const ids = Array.isArray(row?.itemIds) ? row.itemIds : [row?.id];
+  const relatedDates = (stockMovements || [])
+    .filter((mv) => ids.some((id) => sameId(id, mv.itemId)))
+    .map((mv) => mv.date)
+    .filter(Boolean)
+    .sort((a, b) => String(b).localeCompare(String(a)));
+  return relatedDates[0] || null;
+}
+
+function OperationalSignal({ icon, title, value, subtitle, tone = "emerald", onClick }) {
+  const toneMap = {
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    sky: "border-sky-200 bg-sky-50 text-sky-800",
+    slate: "border-slate-200 bg-slate-50 text-slate-800",
+  };
+  const content = (
+    <div className={`h-full rounded-[22px] border p-4 ${toneMap[tone] || toneMap.emerald}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] font-bold opacity-75">{title}</p>
+          <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
+          <p className="mt-1 text-sm leading-snug opacity-80">{subtitle}</p>
+        </div>
+        <div className="h-11 w-11 rounded-2xl bg-white/70 flex items-center justify-center text-lg shadow-sm">{icon}</div>
+      </div>
+    </div>
+  );
+
+  if (!onClick) return content;
+  return (
+    <button type="button" onClick={onClick} className="text-left transition hover:-translate-y-0.5">
+      {content}
+    </button>
+  );
+}
+
+function PlanejamentoPremiumPanel({ obraNome }) {
+  const planejado = 0;
+  const executado = 0;
+  const desvio = executado - planejado;
+  const desvioAbs = Math.abs(desvio);
+  const status = planejado === 0 && executado === 0 ? "Aguardando dados" : desvio >= -3 ? "Em dia" : desvio >= -10 ? "Atenção" : "Crítico";
+  const statusTone = status === "Em dia" ? "emerald" : status === "Atenção" ? "amber" : status === "Crítico" ? "rose" : "slate";
+  const statusClass = {
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    rose: "border-rose-200 bg-rose-50 text-rose-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-600",
+  }[statusTone];
+  const leitura = status === "Aguardando dados"
+    ? "Cadastre períodos, EAP e medições para ativar a leitura automática da Curva S executiva."
+    : desvio < 0
+      ? `Executado ${desvioAbs}% abaixo do planejado. Recomenda-se revisar frentes críticas, medições pendentes e plano de recuperação.`
+      : "Obra dentro da meta operacional prevista para o período.";
+  const acao = status === "Aguardando dados"
+    ? "Próximo passo: alimentar medições e períodos para liberar o painel executivo."
+    : status === "Crítico"
+      ? "Prioridade: replanejar frentes atrasadas e validar impacto no prazo final."
+      : status === "Atenção"
+        ? "Acompanhar evolução semanal e corrigir pequenos desvios antes que virem atraso."
+        : "Manter ritmo atual e acompanhar aderência semanal da execução.";
+
+  const kpis = [
+    { label: "Planejado", value: `${planejado}%`, hint: "Avanço previsto", tone: "emerald" },
+    { label: "Executado", value: `${executado}%`, hint: "Avanço medido", tone: "sky" },
+    { label: "Desvio", value: `${desvio > 0 ? "+" : ""}${desvio}%`, hint: "Executado - planejado", tone: desvio < 0 ? "rose" : "emerald" },
+    { label: "Status", value: status, hint: "Leitura automática", tone: statusTone },
+    { label: "Tendência", value: status === "Aguardando dados" ? "—" : desvio < -10 ? "Atraso" : desvio < -3 ? "Atenção" : "Estável", hint: "Projeção operacional", tone: statusTone },
+  ];
+  const toneClasses = {
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    sky: "border-sky-200 bg-sky-50 text-sky-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+  const plannedPoints = "40,185 145,175 250,140 355,102 460,62 575,36 690,25";
+  const executedPoints = "40,185 145,181 250,160 355,132 460,96 575,68 690,52";
+
+  return (
+    <section className="mb-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-700">Planejamento Premium V1.1</p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Dashboard executivo da obra</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">Curva S, KPIs e leitura automática do avanço{obraNome ? `: ${obraNome}` : ""}.</p>
+        </div>
+        <div className={`rounded-2xl border px-5 py-4 text-right shadow-sm ${statusClass}`}>
+          <p className="text-[11px] font-black uppercase tracking-[0.22em]">Status da obra</p>
+          <p className="mt-1 text-2xl font-black">{status}</p>
+          <p className="mt-1 text-xs font-semibold opacity-80">Baseado em planejado × executado</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {kpis.map((item) => (
+          <div key={item.label} className={`rounded-2xl border p-5 shadow-sm ${toneClasses[item.tone] || toneClasses.slate}`}>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] opacity-75">{item.label}</p>
+            <p className="mt-3 text-3xl font-black tracking-tight">{item.value}</p>
+            <p className="mt-1 text-xs font-semibold opacity-80">{item.hint}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Curva S executiva</p>
+              <h3 className="text-lg font-black text-slate-950">Planejado × Executado</h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+              <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Planejado</span>
+              <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Executado</span>
+              <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Desvio</span>
+            </div>
+          </div>
+          <div className="h-64 rounded-3xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white p-4">
+            <svg viewBox="0 0 760 250" className="h-full w-full" role="img" aria-label="Curva S executiva planejado versus executado">
+              <defs>
+                <linearGradient id="neroCurveBg" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#ecfdf5" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <rect x="40" y="24" width="680" height="176" rx="18" fill="url(#neroCurveBg)" />
+              {[0,1,2,3,4].map((i) => <line key={i} x1="48" x2="720" y1={200 - i*40} y2={200 - i*40} stroke="#e2e8f0" strokeWidth="1" />)}
+              <line x1="48" y1="200" x2="720" y2="200" stroke="#cbd5e1" strokeWidth="2" />
+              <line x1="48" y1="24" x2="48" y2="200" stroke="#cbd5e1" strokeWidth="2" />
+              <polyline points={plannedPoints} fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points={executedPoints} fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="11 10" />
+              <line x1="690" y1="25" x2="690" y2="52" stroke="#ef4444" strokeWidth="3" strokeDasharray="5 6" />
+              <circle cx="690" cy="25" r="7" fill="#10b981" />
+              <circle cx="690" cy="52" r="7" fill="#3b82f6" />
+              <text x="48" y="226" fill="#64748b" fontSize="13" fontWeight="700">Início</text>
+              <text x="660" y="226" fill="#64748b" fontSize="13" fontWeight="700">Atual</text>
+            </svg>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          <div className="rounded-3xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-300">Leitura automática</p>
+            <h3 className="mt-2 text-2xl font-black">{status}</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{leitura}</p>
+          </div>
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Ação recomendada</p>
+            <p className="mt-3 text-sm font-semibold leading-6">{acao}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToDiarias, onGoToHistory, onGoToComissionamento }) {
+  const [activeInsightPanel, setActiveInsightPanel] = useState("critical");
   const pendingCount = data.maintenance.filter((item) => getMaintenanceStatus(item) !== "Entregue").length;
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
   const stockBalanceRows = buildStockBalanceRows(data.stock || [], data.stockMovements || [], STOCK_CODE_CATALOG, data.hiddenStockGroupPrefixes || []);
   const criticalStock = stockBalanceRows.filter((item) => Number(item.saldo || 0) < Number(item.min || 0)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
   const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.totalCost || item.cost || item.estimated_cost || 0), 0);
+  const criticalStockRows = stockBalanceRows
+    .filter((item) => Number(item.saldo || 0) < Number(item.min || 0))
+    .sort((a, b) => (Number(b.min || 0) - Number(b.saldo || 0)) - (Number(a.min || 0) - Number(a.saldo || 0)));
+  const stockWithoutRecentMovement = stockBalanceRows
+    .filter((item) => !item.isCatalogOnly && Number(item.saldo || 0) > 0)
+    .map((item) => ({ ...item, lastMovementDate: getLastMovementDateForStockRow(item, data.stockMovements || []) }))
+    .filter((item) => {
+      const days = daysSinceDate(item.lastMovementDate);
+      return days === null || days >= 30;
+    })
+    .sort((a, b) => String(a.lastMovementDate || "0000-00-00").localeCompare(String(b.lastMovementDate || "0000-00-00")));
+  const delayedMaintenanceRows = data.maintenance
+    .filter((item) => getMaintenanceStatus(item) === "Atrasado")
+    .sort((a, b) => String(a.deadline || a.dueDate || a.deliveryDate || "9999-99-99").localeCompare(String(b.deadline || b.dueDate || b.deliveryDate || "9999-99-99")));
+  const totalStockValue = stockBalanceRows.reduce((acc, item) => acc + Number(item.saldo || 0) * Number(item.price || 0), 0);
+  const operationalHealthScore = Math.max(0, 100 - (criticalStockRows.length * 3) - (delayedCount * 6) - Math.min(stockWithoutRecentMovement.length * 1.5, 25));
+  const operationalScoreRounded = Math.round(operationalHealthScore);
+  const operationalLevel =
+    operationalScoreRounded >= 90
+      ? { label: "Excelente", tone: "emerald", text: "Operação saudável, sem alertas relevantes." }
+      : operationalScoreRounded >= 70
+        ? { label: "Estável", tone: "emerald", text: "Operação controlada, com poucos pontos de atenção." }
+        : operationalScoreRounded >= 50
+          ? { label: "Atenção", tone: "amber", text: "Há alertas que merecem acompanhamento." }
+          : { label: "Crítico", tone: "rose", text: "A operação exige correção e acompanhamento próximo." };
+  const operationalLevelClasses =
+    operationalLevel.tone === "emerald"
+      ? { box: "border-emerald-200 bg-emerald-50", label: "text-emerald-700", badge: "border-emerald-200 bg-emerald-100 text-emerald-800" }
+      : operationalLevel.tone === "amber"
+        ? { box: "border-amber-200 bg-amber-50", label: "text-amber-700", badge: "border-amber-200 bg-amber-100 text-amber-800" }
+        : { box: "border-rose-200 bg-rose-50", label: "text-rose-700", badge: "border-rose-200 bg-rose-100 text-rose-800" };
+
+  const recommendedAction = (() => {
+    if (criticalStockRows.length > 0) {
+      const firstItems = criticalStockRows.slice(0, 2).map((item) => item.material).join(", ");
+      return {
+        title: "Priorizar reposição de estoque",
+        text: `Há ${criticalStockRows.length} item(ns) abaixo do mínimo${firstItems ? `, incluindo ${firstItems}` : ""}. Recomenda-se revisar entradas, compras ou remanejamento ainda nesta rotina.`,
+        tone: "rose",
+      };
+    }
+
+    if (delayedCount > 0) {
+      return {
+        title: "Tratar manutenção atrasada",
+        text: `Existe(m) ${delayedCount} OS/manutenção(ões) com prazo ultrapassado. Recomenda-se priorizar a baixa, reprogramação ou atualização de status.`,
+        tone: "rose",
+      };
+    }
+
+    if (stockWithoutRecentMovement.length > 0) {
+      return {
+        title: "Revisar materiais sem giro",
+        text: `${stockWithoutRecentMovement.length} material(is) possuem saldo e pouca movimentação recente. Avalie se continuam necessários, se devem ser remanejados ou mantidos em estoque.`,
+        tone: "amber",
+      };
+    }
+
+    return {
+      title: "Operação estável",
+      text: "Nenhum alerta relevante encontrado no momento. Mantenha a rotina de acompanhamento e os lançamentos atualizados.",
+      tone: "emerald",
+    };
+  })();
+
+  const recommendedActionClasses =
+    recommendedAction.tone === "rose"
+      ? "border-rose-100 bg-rose-50 text-rose-900"
+      : recommendedAction.tone === "amber"
+        ? "border-amber-100 bg-amber-50 text-amber-900"
+        : "border-emerald-100 bg-emerald-50 text-emerald-900";
+
+  const activeInsightData = (() => {
+    if (activeInsightPanel === "idle") {
+      return {
+        eyebrow: "Materiais sem giro",
+        title: "Itens com saldo e pouca movimentação",
+        text: "Avalie se esses materiais devem permanecer no estoque, ser remanejados ou entrar em programação de consumo.",
+        tone: "amber",
+        rows: stockWithoutRecentMovement.slice(0, 6).map((item) => ({
+          key: `idle-${item.code}`,
+          title: `${item.code} • ${item.material}`,
+          meta: (() => {
+            const days = daysSinceDate(item.lastMovementDate);
+            return days === null ? "Sem movimentação registrada" : `${days} dia(s) desde a última movimentação`;
+          })(),
+          value: `${formatQuantity(item.saldo)} ${item.unit || "un"}`,
+        })),
+        empty: "Nenhum material parado relevante.",
+        actionLabel: "Abrir almoxarifado",
+        action: onGoToStock,
+      };
+    }
+
+    if (activeInsightPanel === "maintenance") {
+      return {
+        eyebrow: "Manutenções atrasadas",
+        title: "OS com prazo ultrapassado",
+        text: "Priorize baixa, reprogramação ou atualização de status para reduzir risco operacional.",
+        tone: "rose",
+        rows: delayedMaintenanceRows.slice(0, 6).map((item) => ({
+          key: `maintenance-${item.id || item.title || item.name}`,
+          title: item.title || item.name || item.item || "Manutenção sem título",
+          meta: `Status: ${getMaintenanceStatus(item)}`,
+          value: item.deadline || item.dueDate || item.deliveryDate || "Prazo não informado",
+        })),
+        empty: "Nenhuma manutenção atrasada.",
+        actionLabel: "Abrir manutenções",
+        action: onGoToMaintenance,
+      };
+    }
+
+    if (activeInsightPanel === "value") {
+      const valueRows = stockBalanceRows
+        .filter((item) => Number(item.saldo || 0) > 0 && Number(item.price || 0) > 0)
+        .sort((a, b) => (Number(b.saldo || 0) * Number(b.price || 0)) - (Number(a.saldo || 0) * Number(a.price || 0)))
+        .slice(0, 6)
+        .map((item) => ({
+          key: `value-${item.code}`,
+          title: `${item.code} • ${item.material}`,
+          meta: `${formatQuantity(item.saldo)} ${item.unit || "un"} × ${formatCurrencyBR(item.price)}`,
+          value: formatCurrencyBR(Number(item.saldo || 0) * Number(item.price || 0)),
+        }));
+      return {
+        eyebrow: "Valor físico-financeiro",
+        title: "Materiais com maior valor em estoque",
+        text: "Use esta leitura para orientar conferências, proteção de ativo e decisões de compra.",
+        tone: "sky",
+        rows: valueRows,
+        empty: "Nenhum valor de estoque relevante encontrado.",
+        actionLabel: "Abrir almoxarifado",
+        action: onGoToStock,
+      };
+    }
+
+    return {
+      eyebrow: "Estoque crítico",
+      title: "Itens abaixo do mínimo operacional",
+      text: "Priorize reposição, entrada de compra ou remanejamento para evitar parada de frente de serviço.",
+      tone: "rose",
+      rows: criticalStockRows.slice(0, 6).map((item) => ({
+        key: `critical-${item.code}`,
+        title: `${item.code} • ${item.material}`,
+        meta: `Saldo atual: ${formatQuantity(item.saldo)} ${item.unit || "un"}`,
+        value: `mín. ${formatQuantity(item.min)}`,
+      })),
+      empty: "Nenhum item abaixo do mínimo.",
+      actionLabel: "Abrir almoxarifado",
+      action: onGoToStock,
+    };
+  })();
+
+  const activeInsightClasses =
+    activeInsightData.tone === "rose"
+      ? "border-rose-100 bg-rose-50/80 text-rose-950"
+      : activeInsightData.tone === "amber"
+        ? "border-amber-100 bg-amber-50/80 text-amber-950"
+        : activeInsightData.tone === "sky"
+          ? "border-sky-100 bg-sky-50/80 text-sky-950"
+          : "border-emerald-100 bg-emerald-50/80 text-emerald-950";
 
   return (
     <div className="space-y-5">
@@ -2291,6 +2629,155 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
         </div>
       </Card>
 
+      <Card className="overflow-hidden border-emerald-100 shadow-[0_18px_48px_rgba(15,23,42,0.07)]">
+        <div className="p-5 md:p-7 bg-gradient-to-br from-white via-emerald-50/40 to-white">
+          <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4 mb-5">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700 font-black">Inteligência Operacional V1.5</p>
+              <h3 className="text-2xl md:text-[2rem] font-black text-slate-950 mt-1 tracking-tight">Painel inteligente NERO</h3>
+              <p className="text-sm md:text-base text-slate-600 mt-2">Leitura automática dos pontos que pedem atenção na operação da obra.</p>
+            </div>
+            <div className={`rounded-2xl border px-4 py-3 shadow-sm min-w-[230px] ${operationalLevelClasses.box}`}>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500 font-bold">Nível operacional</p>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p className={`text-3xl font-black ${operationalLevelClasses.label}`}>{operationalScoreRounded}%</p>
+                <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.08em] ${operationalLevelClasses.badge}`}>{operationalLevel.label}</span>
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-600 leading-snug">{operationalLevel.text}</p>
+            </div>
+          </div>
+
+          <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <OperationalSignal
+              icon="⚠️"
+              title="Estoque crítico"
+              value={criticalStockRows.length}
+              subtitle={criticalStockRows.length ? `${criticalStockRows.slice(0, 2).map((item) => item.material).join(", ")}${criticalStockRows.length > 2 ? "..." : ""}` : "Nenhum item abaixo do mínimo"}
+              tone={criticalStockRows.length ? "rose" : "emerald"}
+              onClick={() => setActiveInsightPanel("critical")}
+            />
+            <OperationalSignal
+              icon="📦"
+              title="Sem giro"
+              value={stockWithoutRecentMovement.length}
+              subtitle={stockWithoutRecentMovement.length ? "Itens com saldo e sem movimentação recente" : "Giro de estoque em dia"}
+              tone={stockWithoutRecentMovement.length ? "amber" : "emerald"}
+              onClick={() => setActiveInsightPanel("idle")}
+            />
+            <OperationalSignal
+              icon="🛠️"
+              title="Manutenções atrasadas"
+              value={delayedCount}
+              subtitle={delayedCount ? "OS com prazo ultrapassado" : "Nenhuma manutenção atrasada"}
+              tone={delayedCount ? "rose" : "emerald"}
+              onClick={() => setActiveInsightPanel("maintenance")}
+            />
+            <OperationalSignal
+              icon="💰"
+              title="Valor em estoque"
+              value={formatCurrencyBR(totalStockValue)}
+              subtitle="Posição físico-financeira consolidada"
+              tone="sky"
+              onClick={() => setActiveInsightPanel("value")}
+            />
+          </section>
+
+          <div className={`mt-5 rounded-[26px] border p-4 md:p-5 shadow-sm ${activeInsightClasses}`}>
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] font-black opacity-75">{activeInsightData.eyebrow}</p>
+                <h4 className="mt-1 text-xl font-black text-slate-950">{activeInsightData.title}</h4>
+                <p className="mt-1 text-sm text-slate-600 max-w-3xl">{activeInsightData.text}</p>
+              </div>
+              <button type="button" onClick={activeInsightData.action} className="rounded-2xl border border-white/70 bg-white px-4 py-2 text-sm font-black text-slate-800 shadow-sm hover:-translate-y-0.5 transition">
+                {activeInsightData.actionLabel}
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {activeInsightData.rows.map((row) => (
+                <div key={row.key} className="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-950 truncate">{row.title}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">{row.meta}</p>
+                    </div>
+                    <span className="text-xs font-black text-slate-700 whitespace-nowrap">{row.value}</span>
+                  </div>
+                </div>
+              ))}
+              {!activeInsightData.rows.length && (
+                <div className="rounded-2xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-bold text-slate-700">
+                  {activeInsightData.empty}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="rounded-[22px] border border-rose-100 bg-white/90 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-rose-700 font-black">Estoque mínimo</p>
+                  <p className="mt-1 text-sm text-slate-600">Itens abaixo do limite operacional.</p>
+                </div>
+                <button type="button" onClick={onGoToStock} className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-700 hover:bg-rose-100">Abrir</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {criticalStockRows.slice(0, 4).map((item) => (
+                  <div key={`critical-${item.code}`} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black text-slate-900 truncate">{item.code} • {item.material}</p>
+                      <span className="text-xs font-black text-rose-700 whitespace-nowrap">{formatQuantity(item.saldo)} / mín. {formatQuantity(item.min)}</span>
+                    </div>
+                  </div>
+                ))}
+                {!criticalStockRows.length && <p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">Nenhum item abaixo do mínimo.</p>}
+                {criticalStockRows.length > 4 && <p className="text-xs font-bold text-slate-500">+ {criticalStockRows.length - 4} item(ns) em atenção.</p>}
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-amber-100 bg-white/90 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-amber-700 font-black">Sem giro</p>
+                  <p className="mt-1 text-sm text-slate-600">Materiais com saldo e pouca movimentação.</p>
+                </div>
+                <button type="button" onClick={onGoToStock} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 hover:bg-amber-100">Abrir</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {stockWithoutRecentMovement.slice(0, 4).map((item) => {
+                  const days = daysSinceDate(item.lastMovementDate);
+                  return (
+                    <div key={`idle-${item.code}`} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-slate-900 truncate">{item.code} • {item.material}</p>
+                        <span className="text-xs font-black text-amber-700 whitespace-nowrap">{days === null ? "sem movimento" : `${days} dia(s)`}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!stockWithoutRecentMovement.length && <p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">Nenhum material parado relevante.</p>}
+                {stockWithoutRecentMovement.length > 4 && <p className="text-xs font-bold text-slate-500">+ {stockWithoutRecentMovement.length - 4} item(ns) sem giro.</p>}
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-sky-100 bg-white/90 p-4 shadow-sm">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-sky-700 font-black">Ação recomendada</p>
+              <p className="mt-1 text-sm text-slate-600">Leitura automática da operação nesta obra.</p>
+              <div className={`mt-4 rounded-2xl border p-4 ${recommendedActionClasses}`}>
+                <p className="text-sm font-black text-slate-900">{recommendedAction.title}</p>
+                <p className="text-sm text-slate-600 mt-2">{recommendedAction.text}</p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-800">Almoxarifado ativo</span>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sky-800">Planejamento: próxima fase</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700">Sem auditoria operacional</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <QuickActionCard icon={Package} title="Almoxarifado" subtitle="Consulta e cadastro de materiais" onClick={onGoToStock} />
         <QuickActionCard icon={Briefcase} title="Diárias" subtitle="Semanas, cargos e pagamentos" onClick={onGoToDiarias} />
@@ -2309,6 +2796,9 @@ function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBac
   const [reportCategory, setReportCategory] = useState("Todas");
   const [cardQuery, setCardQuery] = useState("");
   const [cardCategory, setCardCategory] = useState("Todas");
+  const [movementsReportOpen, setMovementsReportOpen] = useState(false);
+  const [movementsReportQuery, setMovementsReportQuery] = useState("");
+  const [movementsReportType, setMovementsReportType] = useState("Todos");
   const [consumptionModalOpen, setConsumptionModalOpen] = useState(false);
   const [consumptionRange, setConsumptionRange] = useState({ start: getTodayISO().slice(0, 8) + "01", end: getTodayISO() });
 
@@ -2346,6 +2836,39 @@ function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBac
 
   const totalUnits = stockBalanceRows.reduce((acc, item) => acc + Number(item.saldo || 0), 0);
   const movementCount = (stockMovements || []).length;
+
+  const movementReportRows = useMemo(() => {
+    const query = movementsReportQuery.trim().toLowerCase();
+    const selectedType = normalizeStockMovementType(movementsReportType);
+
+    return [...(stockMovements || [])]
+      .map((mv) => {
+        const item = (stock || []).find((row) => sameId(row.id, mv.itemId));
+        const parsed = parseStockItemLabel(item?.item || "");
+        const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "Material não encontrado", item?.category);
+        return {
+          ...mv,
+          typeLabel: normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída",
+          normalizedType: normalizeStockMovementType(mv.type),
+          code: canonical.code || parsed.code || "-",
+          material: canonical.description || parsed.description || item?.item || "Material não encontrado",
+          category: canonical.category || item?.category || "Material",
+          unit: item?.unit || "un",
+          currentBalance: item ? calculateStockBalance(item.id, stockMovements, item.quantity) : null,
+        };
+      })
+      .filter((row) => {
+        const matchesType = selectedType === "todos" || row.normalizedType === selectedType;
+        const matchesQuery = !query
+          || String(row.code || "").toLowerCase().includes(query)
+          || String(row.material || "").toLowerCase().includes(query)
+          || String(row.category || "").toLowerCase().includes(query)
+          || String(row.responsible || "").toLowerCase().includes(query)
+          || String(row.note || "").toLowerCase().includes(query);
+        return matchesType && matchesQuery;
+      })
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(a.code || "").localeCompare(String(b.code || ""), "pt-BR", { numeric: true, sensitivity: "base" }));
+  }, [movementsReportQuery, movementsReportType, stock, stockMovements]);
 
   const filteredStockBalanceRows = useMemo(() => {
     const query = reportQuery.trim().toLowerCase();
@@ -2396,7 +2919,7 @@ function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBac
 
   return (
     <div className="space-y-5">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onOpenGroupEdit}><LayoutDashboard className="h-4 w-4" /> Editar grupos</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportStockPosition?.()}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onRegularizeInitialStock}><Package className="h-4 w-4" /> Regularizar saldo inicial</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onOpenGroupEdit}><LayoutDashboard className="h-4 w-4" /> Editar grupos</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setMovementsReportOpen(true)}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportStockPosition?.()}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onRegularizeInitialStock}><Package className="h-4 w-4" /> Regularizar saldo inicial</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       {cleanupFeedback ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{cleanupFeedback}</div> : null}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <HomeStatCard title="Itens consolidados" value={stockBalanceRows.length} subtitle="Materiais ativos da obra atual" icon={Package} />
@@ -2605,6 +3128,97 @@ function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBac
           </div>
         </div>
       </Card>
+
+      <Modal open={movementsReportOpen} title="Relatório de movimentações" onClose={() => setMovementsReportOpen(false)}>
+        <div className="space-y-5">
+          <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold tracking-wide text-emerald-700 uppercase">Visualização em tela</p>
+              <h3 className="text-2xl font-bold text-slate-900">Movimentações do almoxarifado</h3>
+              <p className="text-sm text-slate-500">Consulte entradas e saídas antes de gerar o PDF executivo.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 xl:items-center">
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  value={movementsReportQuery}
+                  onChange={(e) => setMovementsReportQuery(e.target.value)}
+                  placeholder="Buscar código, material, responsável ou observação"
+                  className="w-full min-w-[260px] bg-transparent text-sm outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <select
+                value={movementsReportType}
+                onChange={(e) => setMovementsReportType(e.target.value)}
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Entrada">Entradas</option>
+                <option value="Saída">Saídas</option>
+              </select>
+              <Button variant="outline" className="min-w-[150px] h-12 justify-center border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold" onClick={onExportMovements}>
+                <Download className="h-4 w-4" /> GERAR PDF
+              </Button>
+            </div>
+          </div>
+
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500 font-bold">Movimentações</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{movementReportRows.length}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-emerald-700 font-bold">Entradas filtradas</p>
+              <p className="mt-1 text-2xl font-black text-emerald-800">{movementReportRows.filter((row) => row.normalizedType === "entrada").length}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold">Saídas filtradas</p>
+              <p className="mt-1 text-2xl font-black text-amber-800">{movementReportRows.filter((row) => row.normalizedType === "saida").length}</p>
+            </div>
+          </section>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-emerald-500 text-white">
+                <tr>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">DATA</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">TIPO</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">CÓDIGO</th>
+                  <th className="px-4 py-3 text-left font-semibold !text-white text-white">MATERIAL</th>
+                  <th className="px-4 py-3 text-left font-semibold !text-white text-white">RESPONSÁVEL</th>
+                  <th className="px-4 py-3 text-left font-semibold !text-white text-white">OBSERVAÇÃO</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">MOV.</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">SALDO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movementReportRows.length ? movementReportRows.map((row, index) => (
+                  <tr key={row.id || `${row.code}-${index}`} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center text-slate-700">{formatDateBR(row.date)}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center">
+                      <Badge className={row.normalizedType === "entrada" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200"}>{row.typeLabel}</Badge>
+                    </td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center font-semibold text-slate-800">{row.code}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-slate-800">{row.material}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-slate-700">{row.responsible || "-"}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-slate-700">{row.note || "-"}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">{row.normalizedType === "entrada" ? "+" : "-"} {formatNumberBR(row.quantity)} {row.unit}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">{row.currentBalance === null ? "-" : `${formatNumberBR(row.currentBalance)} ${row.unit}`}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-6 text-center text-slate-500">Nenhuma movimentação encontrada para os filtros aplicados.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setMovementsReportOpen(false)}>Fechar</Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={consumptionModalOpen} title="Consumo por período" onClose={() => setConsumptionModalOpen(false)}>
         <div className="space-y-5">
@@ -7067,8 +7681,11 @@ export default function App() {
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "comissionamento" && <ComissionamentoApp onBackHome={() => setCurrentPage("dashboard")} />}
                   {currentPage === "planejamento-dashboard" && (
-                  <PlanejamentoDashboard obraId={obraAtual?.id} obraNome={obraAtual?.nome} />
-                )}
+                    <>
+                      <PlanejamentoPremiumPanel obraNome={obraAtual?.nome} />
+                      <PlanejamentoDashboard obraId={obraAtual?.id} obraNome={obraAtual?.nome} />
+                    </>
+                  )}
                   {currentPage === "planejamento-eap" && (
                   <PlanejamentoEAP obraId={obraAtual?.id} obraNome={obraAtual?.nome} />
                 )}
