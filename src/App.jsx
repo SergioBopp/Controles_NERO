@@ -60,6 +60,7 @@ const initialData = {
   stockMovements: [],
   stockCategories: ["Material"],
   stockCodeCatalog: [],
+  hiddenStockGroupPrefixes: [],
   stockResponsibles: [],
   attendance: [],
   attendanceDays: [],
@@ -122,25 +123,25 @@ const STOCK_CODE_CATALOG = [
   {
     "code": "ASV-007",
     "description": "Adesivo Plástico Amanco",
-    "category": "🧴 Adesivos e Vedação (ADE)",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
     "prefix": "ASV"
   },
   {
     "code": "ASV-008",
     "description": "Adesivo para pisos vinílicos Quartzolit",
-    "category": "🧴 Adesivos e Vedação (ADE)",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
     "prefix": "ASV"
   },
   {
     "code": "ASV-009",
     "description": "Fita Teflon Noah",
-    "category": "🧴 Adesivos e Vedação (ADE)",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
     "prefix": "ASV"
   },
   {
     "code": "ASV-010",
     "description": "Fita Dupla Face",
-    "category": "🧴 Adesivos e Vedação (ADE)",
+    "category": "🧴 Adesivos, Selantes e Vedações (ASV)",
     "prefix": "ASV"
   },
   {
@@ -1071,6 +1072,16 @@ const STOCK_CODE_ALIAS_MAP = {
   "ADE-002": "ASV-008",
   "ADE-003": "ASV-009",
   "ADE-004": "ASV-010",
+  "SVE-001": "ASV-001",
+  "SVE-002": "ASV-002",
+  "SVE-003": "ASV-003",
+  "SVE-004": "ASV-004",
+  "SVE-005": "ASV-005",
+  "SVE-006": "ASV-006",
+  "SVE-007": "ASV-007",
+  "SVE-008": "ASV-008",
+  "SVE-009": "ASV-009",
+  "SVE-010": "ASV-010",
   "AL-001": "MCO-012",
   "MC-001": "MCO-001",
   "MC-002": "MCO-002",
@@ -1168,6 +1179,37 @@ const STOCK_CATEGORY_BY_PREFIX = Object.fromEntries(
     .filter(([prefix, category]) => /^[A-Z]{3}$/.test(prefix) && category)
 );
 
+
+const CANONICAL_STOCK_GROUP_LABELS = {
+  ELE: "⚡ Elétrica (ELE)",
+  TIN: "🎨 Tintas e Complementos (TIN)",
+  HID: "🔧 Hidráulica (HID)",
+  UEP: "🚨 Uniformes e EPIs (UEP)",
+  GER: "🧰 Materiais Gerais (GER)",
+  PRN: "🧱 Pisos, Revestimentos e Nivelamento (PRN)",
+  DRY: "🪵 Drywall e Isolamento (DRY)",
+  LME: "🛠️ Louças e Metais (LME)",
+  FER: "🛠️ Ferramentas (FER)",
+  MCO: "Materiais de Construção (MCO)",
+  ASV: "🧴 Adesivos, Selantes e Vedações (ASV)",
+  FX: "Fixação (FX)",
+  FIT: "Fitas (FIT)",
+};
+
+function normalizeStockGroupAlias(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (normalized === "ADE" || normalized === "SVE" || normalized === "AD") return "ASV";
+  return normalized;
+}
+
+function getCanonicalStockGroupLabel(code, fallback = "") {
+  const normalized = normalizeStockGroupAlias(extractStockGroupCode(code) || normalizeStockGroupCode(code));
+  if (/^[A-Z]{3}$/.test(normalized) && CANONICAL_STOCK_GROUP_LABELS[normalized]) return CANONICAL_STOCK_GROUP_LABELS[normalized];
+  const fallbackCode = normalizeStockGroupAlias(extractStockGroupCode(fallback));
+  if (/^[A-Z]{3}$/.test(fallbackCode) && CANONICAL_STOCK_GROUP_LABELS[fallbackCode]) return CANONICAL_STOCK_GROUP_LABELS[fallbackCode];
+  return String(fallback || "").trim();
+}
+
 function isGenericStockCategory(category) {
   const normalized = String(category || "").trim().toLowerCase();
   return !normalized || normalized === "material" || normalized === "materiais" || normalized === "materiais (mat)" || normalized === "material (mat)";
@@ -1175,17 +1217,21 @@ function isGenericStockCategory(category) {
 
 function inferStockCategoryFromCode(code, fallbackCategory = "Material") {
   const normalizedCode = String(code || "").trim().toUpperCase();
-  const prefix = normalizedCode.match(/^([A-Z]{3})-\d{3}$/)?.[1] || "";
+  const aliasedCode = STOCK_CODE_ALIAS_MAP[normalizedCode] || normalizedCode;
+  const prefix = normalizeStockGroupAlias(aliasedCode.match(/^([A-Z]{3})-\d{3}$/)?.[1] || "");
   const fallback = String(fallbackCategory || "").trim() || "Material";
 
   if (!prefix) return fallback;
-  const inferredCategory = STOCK_CATEGORY_BY_PREFIX[prefix];
+  const fallbackCode = extractStockGroupCode(fallback);
+  const canonicalLabel = getCanonicalStockGroupLabel(prefix, fallback);
 
-  if (inferredCategory && isGenericStockCategory(fallback)) {
-    return inferredCategory;
+  // Regra nova: todo grupo técnico é exibido por uma única etiqueta canônica AAA.
+  // Isso elimina duplicidades como "Ferramentas" e "Ferramentas (FER)".
+  if (canonicalLabel && (!fallbackCode || fallbackCode === prefix || isGenericStockCategory(fallback))) {
+    return canonicalLabel;
   }
 
-  return fallback;
+  return fallbackCode === prefix ? getCanonicalStockGroupLabel(prefix, fallback) : fallback;
 }
 
 
@@ -1305,22 +1351,31 @@ function normalizeElectricalAlias(code, description) {
 function canonicalizeStockEntry(code, description, category) {
   const normalizedCode = String(code || "").trim().toUpperCase();
   const cleanedDescription = stripLeadingCodeFromDescription(description);
-  const cleanedCategory = inferStockCategoryFromCode(normalizedCode, category);
 
   const electrical = normalizeElectricalAlias(normalizedCode, cleanedDescription);
   if (electrical) return electrical;
 
   const aliasedCode = STOCK_CODE_ALIAS_MAP[normalizedCode] || normalizedCode;
+  const canonicalPrefix = extractStockGroupCode(aliasedCode);
   const catalogEntry = STOCK_CODE_CATALOG_BY_CODE[aliasedCode];
+  const inputDescription = String(cleanedDescription || "").trim();
+  const inputCategory = String(category || "").trim();
+  const inputCategoryCode = extractStockGroupCode(inputCategory);
 
   if (catalogEntry) {
+    const catalogCategory = String(catalogEntry.category || "").trim();
+    const catalogCategoryCode = normalizeStockGroupAlias(extractStockGroupCode(catalogCategory));
+    const canonicalCategoryCode = normalizeStockGroupAlias(catalogCategoryCode || canonicalPrefix);
+    const canonicalCategoryLabel = getCanonicalStockGroupLabel(canonicalCategoryCode, catalogCategory || inputCategory || "Material");
+    const keepInputCategory = inputCategory && inputCategoryCode && normalizeStockGroupAlias(inputCategoryCode) === canonicalCategoryCode;
     return {
       code: catalogEntry.code,
-      description: stripLeadingCodeFromDescription(catalogEntry.description),
-      category: String(catalogEntry.category || cleanedCategory).trim() || "Material",
+      description: inputDescription || stripLeadingCodeFromDescription(catalogEntry.description),
+      category: keepInputCategory ? getCanonicalStockGroupLabel(inputCategoryCode, inputCategory) : (canonicalCategoryLabel || inferStockCategoryFromCode(aliasedCode, inputCategory) || "Material"),
     };
   }
 
+  const cleanedCategory = inferStockCategoryFromCode(aliasedCode, inputCategory);
   return {
     code: aliasedCode,
     description: cleanedDescription,
@@ -1340,9 +1395,8 @@ function getStockCatalogEntry(query, catalog = STOCK_CODE_CATALOG) {
 }
 
 function buildStockItemLabel(code, description) {
-  const canonical = canonicalizeStockEntry(code, description, "");
-  const cleanedCode = String(canonical.code || "").trim();
-  const cleanedDescription = String(canonical.description || "").trim();
+  const cleanedCode = String(code || "").trim().toUpperCase();
+  const cleanedDescription = stripLeadingCodeFromDescription(description);
   if (!cleanedCode) return cleanedDescription;
   return `${cleanedCode} - ${cleanedDescription}`;
 }
@@ -1350,12 +1404,18 @@ function buildStockItemLabel(code, description) {
 function parseStockItemLabel(value) {
   const raw = String(value || "").trim();
   const match = raw.match(/^([A-Z]{2,3}-\d+)\s*-\s*(.+)$/i);
-  if (!match) return canonicalizeStockEntry("", raw, "");
-  return canonicalizeStockEntry(match[1].toUpperCase(), match[2].trim(), "");
+  if (!match) return { code: "", description: stripLeadingCodeFromDescription(raw), category: "" };
+  const originalCode = String(match[1] || "").trim().toUpperCase();
+  const code = STOCK_CODE_ALIAS_MAP[originalCode] || originalCode;
+  return {
+    code,
+    description: stripLeadingCodeFromDescription(match[2] || ""),
+    category: inferStockCategoryFromCode(code, ""),
+  };
 }
 
 function normalizeStockGroupCode(value) {
-  return String(value || "").trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+  return normalizeStockGroupAlias(String(value || "").trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3));
 }
 
 function normalizeResponsibleName(value) {
@@ -1366,12 +1426,26 @@ function extractStockGroupCode(value) {
   const raw = String(value || "").trim().toUpperCase();
   if (!raw) return "";
   const directCode = raw.match(/^([A-Z]{3})-\d{1,}$/);
-  if (directCode) return directCode[1];
+  if (directCode) return normalizeStockGroupAlias(directCode[1]);
   const exactGroup = raw.match(/^([A-Z]{3})$/);
-  if (exactGroup) return exactGroup[1];
+  if (exactGroup) return normalizeStockGroupAlias(exactGroup[1]);
   const labeledGroup = raw.match(/\(([A-Z]{3})\)/);
-  if (labeledGroup) return labeledGroup[1];
+  if (labeledGroup) return normalizeStockGroupAlias(labeledGroup[1]);
   return "";
+}
+
+function getStockRowGroupCode(row) {
+  return extractStockGroupCode(row?.category) || extractStockGroupCode(row?.code) || extractStockGroupCode(row?.item);
+}
+
+function stockCategoryMatches(row, selectedCategory) {
+  const selected = String(selectedCategory || "").trim();
+  if (!selected || selected === "Todas") return true;
+  const selectedCode = extractStockGroupCode(selected);
+  const rowCode = getStockRowGroupCode(row);
+  if (selectedCode) return rowCode === selectedCode;
+  const rowCategory = String(row?.category || "Sem categoria").trim() || "Sem categoria";
+  return rowCategory === selected;
 }
 
 function getStockGroupFriendlyName(value) {
@@ -1388,9 +1462,10 @@ function getStockGroupFriendlyName(value) {
       TIN: "Tintas e Complementos",
       LME: "Luminárias e Equipamentos",
       FER: "Ferramentas",
+      ASV: "Adesivos, Selantes e Vedações",
       FIX: "Fixação",
-      GER: "Fixação",
-      EPI: "EPIs",
+      GER: "Materiais Gerais",
+      UEP: "Uniformes e EPIs",
     };
     return aliases[codeOnly] || `Grupo ${codeOnly}`;
   }
@@ -1532,11 +1607,15 @@ function normalizeLegacyStockCatalogEntry(entry) {
 
 function normalizeLegacyStockItem(item) {
   const parsed = parseStockItemLabel(item?.item || "");
-  const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "", item?.category);
+  const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item, item?.category || parsed.category || "Material");
+  const code = String(canonical.code || parsed.code || "").trim().toUpperCase();
+  const description = String(canonical.description || parsed.description || item?.item || "").trim();
+  const normalizedCategory = canonical.category || inferStockCategoryFromCode(code, item?.category || parsed.category || "Material");
+
   return {
     ...item,
-    item: buildStockItemLabel(canonical.code, canonical.description),
-    category: String(canonical.category || item?.category || "Material").trim() || "Material",
+    item: buildStockItemLabel(code, description),
+    category: String(normalizedCategory || "Material").trim() || "Material",
   };
 }
 
@@ -1548,9 +1627,15 @@ function consolidateLegacyStockData(appData) {
 
   for (const item of rawStock) {
     const parsed = parseStockItemLabel(item?.item || "");
-    const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "", item?.category);
+    const canonical = {
+      code: String(parsed.code || "").trim().toUpperCase(),
+      description: String(parsed.description || item?.item || "").trim(),
+      category: String(item?.category || parsed.category || inferStockCategoryFromCode(parsed.code, "Material") || "Material").trim() || "Material",
+    };
     const obraKey = String(item?.obraId || "");
-    const key = `${obraKey}::${canonical.code}::${canonical.description}`;
+    // Pente fino: no almox, o código técnico é a chave canônica.
+    // Se existir HI-003 e HID-003, ambos viram HID-003 e ficam em um único item.
+    const key = canonical.code ? `${obraKey}::${canonical.code}` : `${obraKey}::${canonical.description}`;
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -1564,9 +1649,14 @@ function consolidateLegacyStockData(appData) {
     } else {
       const current = grouped.get(key);
       current.quantity = Number(current.quantity || 0) + Number(item?.quantity || 0);
-      current.min = Number(current.min || 0) + Number(item?.min || 0);
+      current.min = Math.max(Number(current.min || 0), Number(item?.min || 0));
       if (!current.invoice && item?.invoice) current.invoice = item.invoice;
       if (!Number(current.price || 0) && Number(item?.price || 0) > 0) current.price = Number(item.price || 0);
+      const currentParsed = parseStockItemLabel(current.item || "");
+      if (canonical.description && (!currentParsed.description || currentParsed.description.length < canonical.description.length)) {
+        current.item = buildStockItemLabel(canonical.code, canonical.description);
+      }
+      current.category = inferStockCategoryFromCode(canonical.code, current.category || canonical.category || "Material");
     }
 
     const canonicalItem = grouped.get(key);
@@ -1621,6 +1711,7 @@ function createPersistableAppData(appData) {
         .map((item) => String(item || "").trim())
         .filter(Boolean)
     )).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    hiddenStockGroupPrefixes: Array.from(new Set((appData.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean))),
     stockResponsibles: Array.from(new Set(
       [
         ...(appData.stockResponsibles || []),
@@ -2166,7 +2257,7 @@ function getMaintenanceSortWeight(item) {
 function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGoToMaintenance, onGoToAttendance, onGoToDiarias, onGoToHistory, onGoToComissionamento }) {
   const pendingCount = data.maintenance.filter((item) => getMaintenanceStatus(item) !== "Entregue").length;
   const delayedCount = data.maintenance.filter((item) => getMaintenanceStatus(item) === "Atrasado").length;
-  const stockBalanceRows = buildStockBalanceRows(data.stock || [], data.stockMovements || []);
+  const stockBalanceRows = buildStockBalanceRows(data.stock || [], data.stockMovements || [], STOCK_CODE_CATALOG, data.hiddenStockGroupPrefixes || []);
   const criticalStock = stockBalanceRows.filter((item) => Number(item.saldo || 0) < Number(item.min || 0)).length;
   const totalPresent = data.attendance.reduce((acc, item) => acc + Number(item.qty || 0), 0);
   const totalMaintenanceCost = data.maintenance.reduce((acc, item) => acc + Number(item.totalCost || item.cost || item.estimated_cost || 0), 0);
@@ -2212,8 +2303,8 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onView, onEdit, onEditMovement, onDeleteMovement, onOpenHeaderView, onOpenHeaderEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
-  const stockBalanceRows = buildStockBalanceRows(stock, stockMovements);
+function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBack, onAdd, onDelete, onMove, onView, onEdit, onEditMovement, onDeleteMovement, onOpenHeaderView, onOpenHeaderEdit, onOpenGroupEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
+  const stockBalanceRows = buildStockBalanceRows(stock, stockMovements, STOCK_CODE_CATALOG, hiddenStockGroupPrefixes || []);
   const [reportQuery, setReportQuery] = useState("");
   const [reportCategory, setReportCategory] = useState("Todas");
   const [cardQuery, setCardQuery] = useState("");
@@ -2221,16 +2312,25 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
   const [consumptionModalOpen, setConsumptionModalOpen] = useState(false);
   const [consumptionRange, setConsumptionRange] = useState({ start: getTodayISO().slice(0, 8) + "01", end: getTodayISO() });
 
-  const categories = useMemo(
-    () => ["Todas", ...Array.from(new Set(stockBalanceRows.map((item) => String(item.category || "Sem categoria").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }))],
-    [stockBalanceRows]
-  );
+  const categories = useMemo(() => {
+    const byCode = new Map();
+    stockBalanceRows.forEach((item) => {
+      const code = getStockRowGroupCode(item);
+      if (!/^[A-Z]{3}$/.test(code)) return;
+      const category = inferStockCategoryFromCode(`${code}-000`, item.category || code);
+      const value = extractStockGroupCode(category) === code ? category : `${getStockGroupFriendlyName(code)} (${code})`;
+      const previous = byCode.get(code);
+      if (!previous || formatStockGroupOptionLabel(value).length > formatStockGroupOptionLabel(previous).length) {
+        byCode.set(code, value);
+      }
+    });
+    return ["Todas", ...Array.from(byCode.values()).sort((a, b) => formatStockGroupOptionLabel(a).localeCompare(formatStockGroupOptionLabel(b), "pt-BR", { sensitivity: "base" }))];
+  }, [stockBalanceRows]);
 
   const filteredDisplayItems = useMemo(() => {
     const query = cardQuery.trim().toLowerCase();
     return stockBalanceRows.filter((item) => {
-      const category = String(item?.category || "Sem categoria").trim() || "Sem categoria";
-      const matchesCategory = cardCategory === "Todas" || category === cardCategory;
+      const matchesCategory = stockCategoryMatches(item, cardCategory);
       const matchesQuery = !query
         || String(item.code || "").toLowerCase().includes(query)
         || String(item.material || "").toLowerCase().includes(query)
@@ -2250,8 +2350,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
   const filteredStockBalanceRows = useMemo(() => {
     const query = reportQuery.trim().toLowerCase();
     return stockBalanceRows.filter((row) => {
-      const category = String(row?.category || "Sem categoria").trim() || "Sem categoria";
-      const matchesCategory = reportCategory === "Todas" || category === reportCategory;
+      const matchesCategory = stockCategoryMatches(row, reportCategory);
       const matchesQuery = !query || String(row.code || "").toLowerCase().includes(query) || String(row.material || "").toLowerCase().includes(query);
       return matchesCategory && matchesQuery;
     });
@@ -2297,7 +2396,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
 
   return (
     <div className="space-y-5">
-      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onRegularizeInitialStock}><Package className="h-4 w-4" /> Regularizar saldo inicial</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
+      <Card><CardHeader title="Almoxarifado" description="Materiais padronizados por código, nota fiscal, valor, estoque mínimo e movimentações da obra atual" right={<div className="flex flex-wrap gap-3"><Button variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50" onClick={onOpenHeaderView}><Search className="h-4 w-4" /> Consultar</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onOpenHeaderEdit}><FileText className="h-4 w-4" /> Editar</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onOpenGroupEdit}><LayoutDashboard className="h-4 w-4" /> Editar grupos</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => setConsumptionModalOpen(true)}><Calendar className="h-4 w-4" /> Consumo por período</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportMovements}><FileText className="h-4 w-4" /> Relatório de movimentações</Button><Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={() => onExportStockPosition?.()}><Download className="h-4 w-4" /> Posição de estoque PDF</Button><Button variant="outline" className="border-sky-300 text-sky-800 hover:bg-sky-50" onClick={onRegularizeInitialStock}><Package className="h-4 w-4" /> Regularizar saldo inicial</Button><Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => { if (window.confirm("⚠️ Tem certeza que deseja executar a limpeza definitiva?\n\nEssa ação reprocessa todo o estoque e deve ser usada apenas em manutenção do sistema.")) { onRunLegacyCleanup(); } }}><Trash2 className="h-4 w-4" /> Limpeza definitiva</Button><Button className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" variant="outline" onClick={onAdd}>Novo material</Button><ReturnHomeButton onClick={onBack} /></div>} /></Card>
       {cleanupFeedback ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{cleanupFeedback}</div> : null}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <HomeStatCard title="Itens consolidados" value={stockBalanceRows.length} subtitle="Materiais ativos da obra atual" icon={Package} />
@@ -2447,7 +2546,7 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
             <div>
               <p className="text-sm font-semibold tracking-wide text-emerald-700 uppercase">Visualização em tela</p>
               <h3 className="text-2xl font-bold text-slate-900">Relatório de posição de estoque</h3>
-              <p className="text-sm text-slate-500">Resumo por material com entrada acumulada, saída acumulada e saldo atual.</p>
+              <p className="text-sm text-slate-500">Resumo por material com entrada, saída, saldo e valor físico-financeiro. Use o filtro para visualizar/gerar PDF por grupo.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 xl:items-center">
               <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
@@ -2462,18 +2561,20 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
               <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)} className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none">
                 {categories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
-              <Button variant="outline" className="border-emerald-300 text-emerald-800 hover:bg-emerald-50" onClick={onExportStockPosition}><Download className="h-4 w-4" /> Gerar PDF desta visão</Button>
+              <Button variant="outline" className="min-w-[150px] h-12 justify-center border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold" onClick={() => onExportStockPosition?.(reportCategory, reportQuery)}><Download className="h-4 w-4" /> GERAR PDF</Button>
             </div>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="min-w-full text-sm">
-              <thead className="bg-emerald-500 text-white">
+              <thead className="bg-emerald-500 !text-white text-white">
                 <tr>
-                  <th className="px-4 py-3 text-center font-semibold">CÓDIGO</th>
-                  <th className="px-4 py-3 text-left font-semibold">MATERIAL</th>
-                  <th className="px-4 py-3 text-center font-semibold">ENTRADA</th>
-                  <th className="px-4 py-3 text-center font-semibold">SAÍDA</th>
-                  <th className="px-4 py-3 text-center font-semibold">SALDO</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">CÓDIGO</th>
+                  <th className="px-4 py-3 text-left font-semibold !text-white text-white">DESCRIÇÃO DO MATERIAL</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">ENTRADA</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">SAÍDA</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">SALDO</th>
+                  <th className="px-4 py-3 text-right font-semibold !text-white text-white">VALOR UNIT.</th>
+                  <th className="px-4 py-3 text-right font-semibold !text-white text-white">VALOR TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -2484,13 +2585,22 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
                     <td className="border-t border-slate-200 px-4 py-3 text-center text-slate-700">{row.entrada} {row.unit}</td>
                     <td className="border-t border-slate-200 px-4 py-3 text-center text-slate-700">{row.saida} {row.unit}</td>
                     <td className="border-t border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">{row.saldo} {row.unit}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-right text-slate-700">{formatCurrencyBR(row.price)}</td>
+                    <td className="border-t border-slate-200 px-4 py-3 text-right font-semibold text-slate-900">{formatCurrencyBR(Number(row.saldo || 0) * Number(row.price || 0))}</td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-slate-500">Nenhum material encontrado para os filtros aplicados.</td>
+                    <td colSpan={7} className="px-4 py-6 text-center text-slate-500">Nenhum material encontrado para os filtros aplicados.</td>
                   </tr>
                 )}
               </tbody>
+              <tfoot>
+                <tr className="bg-teal-700 !text-white text-white">
+                  <td colSpan={5} className="px-4 py-3"></td>
+                  <td className="px-4 py-3 text-right font-bold uppercase tracking-wide !text-white text-white">TOTAL GERAL</td>
+                  <td className="px-4 py-3 text-right font-bold !text-white text-white">{formatCurrencyBR(filteredStockBalanceRows.reduce((acc, row) => acc + Number(row.saldo || 0) * Number(row.price || 0), 0))}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -2510,10 +2620,10 @@ function StockPage({ stock, stockMovements, onBack, onAdd, onDelete, onMove, onV
             <table className="min-w-full text-sm">
               <thead className="bg-slate-900 text-white">
                 <tr>
-                  <th className="px-4 py-3 text-center font-semibold">CÓDIGO</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">CÓDIGO</th>
                   <th className="px-4 py-3 text-left font-semibold">MATERIAL</th>
                   <th className="px-4 py-3 text-left font-semibold">CATEGORIA</th>
-                  <th className="px-4 py-3 text-center font-semibold">SAÍDA TOTAL</th>
+                  <th className="px-4 py-3 text-center font-semibold !text-white text-white">SAÍDA TOTAL</th>
                   <th className="px-4 py-3 text-center font-semibold">MOVIMENTAÇÕES</th>
                   <th className="px-4 py-3 text-left font-semibold">ÚLTIMO RESPONSÁVEL</th>
                 </tr>
@@ -3159,13 +3269,15 @@ function calculateStockBalance(itemIds, stockMovements = [], fallbackQuantity = 
   }, 0);
 }
 
-function buildStockBalanceRows(stockItems = [], stockMovements = []) {
+function buildStockBalanceRows(stockItems = [], stockMovements = [], catalogEntries = STOCK_CODE_CATALOG, hiddenGroupPrefixes = []) {
+  const hiddenPrefixSet = new Set((hiddenGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean));
   const grouped = new Map();
 
   for (const item of stockItems || []) {
     const parsed = parseStockItemLabel(item?.item || "");
-    const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "", item?.category);
-    const key = `${canonical.code}::${canonical.description}`;
+    const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item, item?.category || parsed.category || "Material");
+    const canonicalCode = String(canonical.code || "").trim().toUpperCase();
+    const key = canonical.code ? `${canonical.code}` : `${canonical.description}`;
     const itemMovements = (stockMovements || []).filter((mv) => sameId(mv.itemId, item.id));
     const entrada = itemMovements
       .filter((mv) => normalizeStockMovementType(mv.type) === "entrada")
@@ -3187,7 +3299,7 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
         saldo: 0,
         quantity: 0,
         unit: item.unit || "un",
-        category: canonical.category || item?.category || "Material",
+        category: getCanonicalStockGroupLabel(extractStockGroupCode(canonical.category || canonical.code), canonical.category || item?.category || "Material") || canonical.category || item?.category || "Material",
         min: 0,
         invoice: item.invoice || "",
         price: Number(item.price || 0),
@@ -3195,6 +3307,11 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
     }
 
     const current = grouped.get(key);
+    if (canonical.description && !String(item?.id || "").startsWith("catalog-")) {
+      current.material = canonical.description;
+      current.item = buildStockItemLabel(canonical.code, canonical.description);
+      current.category = getCanonicalStockGroupLabel(extractStockGroupCode(canonical.category || canonical.code), inferStockCategoryFromCode(canonical.code, canonical.category || current.category || "Material"));
+    }
     if (!current.itemIds.some((value) => sameId(value, item.id))) {
       current.itemIds.push(item.id);
       current.sourceCount += 1;
@@ -3203,14 +3320,16 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
     current.saida += saida;
     current.saldo += saldoCalculado;
     current.quantity = current.saldo;
-    current.min += Number(item.min || 0);
+    current.min = Math.max(Number(current.min || 0), Number(item.min || 0));
     if (!current.invoice && item.invoice) current.invoice = item.invoice;
     if (!current.price && Number(item.price || 0) > 0) current.price = Number(item.price || 0);
   }
 
-  for (const catalogEntry of STOCK_CODE_CATALOG || []) {
+  for (const catalogEntry of catalogEntries || []) {
+    const catalogPrefix = extractStockGroupCode(catalogEntry?.code) || extractStockGroupCode(catalogEntry?.category) || normalizeStockGroupCode(catalogEntry?.prefix);
+    if (catalogPrefix && hiddenPrefixSet.has(catalogPrefix)) continue;
     const canonical = canonicalizeStockEntry(catalogEntry.code, catalogEntry.description, catalogEntry.category);
-    const key = `${canonical.code}::${canonical.description}`;
+    const key = canonical.code ? `${canonical.code}` : `${canonical.description}`;
     if (!grouped.has(key)) {
       grouped.set(key, {
         id: `catalog-${canonical.code}`,
@@ -3225,7 +3344,7 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
         saldo: 0,
         quantity: 0,
         unit: "un",
-        category: canonical.category || catalogEntry.category || "Material",
+        category: getCanonicalStockGroupLabel(extractStockGroupCode(canonical.category || canonical.code), canonical.category || catalogEntry.category || "Material") || canonical.category || catalogEntry.category || "Material",
         min: 0,
         invoice: "",
         price: 0,
@@ -3241,10 +3360,21 @@ function buildStockBalanceRows(stockItems = [], stockMovements = []) {
   );
 }
 
-async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, selectedAreaLabel = "Almoxarifado") {
+async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, selectedAreaLabel = "Almoxarifado", options = {}) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const generatedAt = getDateTimeBRNoSeconds();
-  const rows = buildStockBalanceRows(stockItems, stockMovements);
+  const rawExportCategory = options?.category;
+  const exportCategory = typeof rawExportCategory === "string"
+    ? rawExportCategory
+    : (rawExportCategory && typeof rawExportCategory === "object"
+        ? (rawExportCategory.value || rawExportCategory.category || rawExportCategory.label || rawExportCategory.name || "Todas")
+        : "Todas");
+  const exportQuery = String(options?.query || "").trim().toLowerCase();
+  const rows = buildStockBalanceRows(stockItems, stockMovements).filter((row) => {
+    const matchesCategory = stockCategoryMatches(row, exportCategory);
+    const matchesQuery = !exportQuery || String(row.code || "").toLowerCase().includes(exportQuery) || String(row.material || "").toLowerCase().includes(exportQuery);
+    return matchesCategory && matchesQuery;
+  });
   const totalStockValue = rows.reduce((acc, row) => acc + Number(row.saldo || 0) * Number(row.price || 0), 0);
 
   const drawHeader = () => {
@@ -3260,7 +3390,7 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
     doc.setFontSize(11);
     doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
     doc.setFont("helvetica", "bold");
-    doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}`, 46, 32);
+    doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}${exportCategory && exportCategory !== "Todas" ? ` • Grupo: ${formatStockGroupOptionLabel(exportCategory)}` : ""}`, 46, 32);
     doc.setFont("helvetica", "normal");
     doc.text(`Gerado em: ${generatedAt}`, pageWidth - 14, 24, { align: "right" });
     doc.line(14, 38, pageWidth - 14, 38);
@@ -3321,12 +3451,13 @@ async function exportStockBalancePdf(stockItems, stockMovements, obraAtual, sele
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("TOTAL GERAL DO ESTOQUE", pageWidth - 82, totalRowY + 4, { align: "right" });
+  doc.text("TOTAL GERAL", pageWidth - 52, totalRowY + 6, { align: "right" });
   doc.text(formatCurrencyBR(totalStockValue), pageWidth - 16, totalRowY + 6, { align: "right" });
   doc.setTextColor(0, 0, 0);
 
   addPageNumbers(doc);
-  downloadPdfDirect(doc, `relatorio-posicao-estoque-almoxarifado-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+  const groupSuffix = exportCategory && exportCategory !== "Todas" ? `-${formatStockGroupOptionLabel(exportCategory).toLowerCase().replace(/[^a-z0-9]+/gi, "-")}` : "";
+  downloadPdfDirect(doc, `relatorio-posicao-estoque-almoxarifado${groupSuffix}-${(obraAtual?.nome || "obra").toLowerCase().replace(/\s+/g, "-")}.pdf`);
 }
 
 
@@ -3355,7 +3486,10 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual, se
   const body = movimentos.map((mv) => {
     const item = (stockItems || []).find((row) => sameId(row.id, mv.itemId));
     const parsed = parseStockItemLabel(item?.item || "");
-    const canonical = canonicalizeStockEntry(parsed.code, parsed.description || item?.item || "", item?.category);
+    const canonical = {
+      code: String(parsed.code || "").trim().toUpperCase(),
+      description: String(parsed.description || item?.item || "").trim(),
+    };
     return [
       formatDateBR(mv.date),
       normalizeStockMovementType(mv.type) === "entrada" ? "Entrada" : "Saída",
@@ -3411,7 +3545,7 @@ async function exportStockMovementsPdf(stockItems, stockMovements, obraAtual, se
       doc.setFontSize(11);
       doc.text(`Obra: ${obraAtual?.nome || "Não informada"}`, 46, 26);
       doc.setFont("helvetica", "bold");
-      doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}`, 46, 32);
+      doc.text(`Seção: ${selectedAreaLabel || "Almoxarifado"}${exportCategory && exportCategory !== "Todas" ? ` • Grupo: ${formatStockGroupOptionLabel(exportCategory)}` : ""}`, 46, 32);
       doc.setFont("helvetica", "normal");
       doc.text(`Gerado em: ${generatedAt}`, pw - 14, 24, { align: "right" });
       doc.line(14, 38, pw - 14, 38);
@@ -4835,6 +4969,8 @@ export default function App() {
   const [stockPickerItemId, setStockPickerItemId] = useState("");
   const [stockPickerQuery, setStockPickerQuery] = useState("");
   const [stockNewCategory, setStockNewCategory] = useState("");
+  const [stockGroupEditModal, setStockGroupEditModal] = useState(false);
+  const [stockGroupEditForm, setStockGroupEditForm] = useState({ oldCategory: "", code: "", name: "" });
   const [stockCodeFeedback, setStockCodeFeedback] = useState("");
   const [legacyCleanupFeedback, setLegacyCleanupFeedback] = useState("");
   const [stockConsumptionModal, setStockConsumptionModal] = useState(false);
@@ -4979,10 +5115,14 @@ export default function App() {
   }
 
   const stockCatalogEntries = useMemo(() => {
+    const hiddenPrefixSet = new Set((data.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean));
     return Array.from(
       new Map(
         [
-          ...STOCK_CODE_CATALOG,
+          ...STOCK_CODE_CATALOG.filter((entry) => {
+            const prefix = extractStockGroupCode(entry?.code) || extractStockGroupCode(entry?.category) || normalizeStockGroupCode(entry?.prefix);
+            return !prefix || !hiddenPrefixSet.has(prefix);
+          }),
           ...(data.stockCodeCatalog || []),
           ...((data.stock || []).map((item) => {
             const parsed = parseStockItemLabel(item?.item);
@@ -5009,7 +5149,7 @@ export default function App() {
           sensitivity: "base",
         })
       );
-  }, [data.stockCodeCatalog, data.stock]);
+  }, [data.stockCodeCatalog, data.stock, data.hiddenStockGroupPrefixes]);
 
   const stockCatalogOptions = useMemo(() => {
     return stockCatalogEntries.map((entry) => `${entry.code} - ${entry.description}`);
@@ -5018,20 +5158,42 @@ export default function App() {
   const stockUnitOptions = useMemo(() => STOCK_UNIT_OPTIONS, []);
 
   const stockCategoryOptions = useMemo(() => {
-    return Array.from(new Set([
-      "Material",
-      ...(data.stockCategories || []),
-      ...stockCatalogEntries.map((entry) => entry.category),
-      ...(data.stock || []).map((item) => item.category),
-    ].map((item) => String(item || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [data.stockCategories, data.stock, stockCatalogEntries]);
+    const hiddenPrefixSet = new Set((data.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean));
+    const byCode = new Map();
+
+    const putCategory = (rawCategory, codeHint = "") => {
+      const hintCode = extractStockGroupCode(codeHint);
+      const explicitCode = extractStockGroupCode(rawCategory);
+      const code = explicitCode || hintCode;
+      if (!/^[A-Z]{3}$/.test(code) || hiddenPrefixSet.has(code)) return;
+
+      // Mantém somente uma opção por código AAA e ignora rótulos antigos sem padrão técnico.
+      const value = getCanonicalStockGroupLabel(code, rawCategory || `${code}`) || `${getStockGroupFriendlyName(code)} (${code})`;
+      byCode.set(code, value);
+    };
+
+    // Catálogo primeiro: define o padrão visual oficial. Dados existentes só complementam códigos faltantes.
+    stockCatalogEntries.forEach((entry) => putCategory(entry.category, entry.code));
+    (data.stockCategories || []).forEach((category) => putCategory(category));
+    (data.stock || []).forEach((item) => {
+      const parsed = parseStockItemLabel(item?.item || "");
+      putCategory(item?.category || parsed.category, parsed.code);
+    });
+
+    return Array.from(byCode.values()).sort((a, b) => formatStockGroupOptionLabel(a).localeCompare(formatStockGroupOptionLabel(b), "pt-BR", { sensitivity: "base" }));
+  }, [data.stockCategories, data.stock, stockCatalogEntries, data.hiddenStockGroupPrefixes]);
 
   const stockGroupOptions = useMemo(() => {
-    return stockCategoryOptions
-      .map((value) => ({ value, code: extractStockGroupCode(value), label: formatStockGroupOptionLabel(value) }))
-      .filter((item) => item.code)
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
-  }, [stockCategoryOptions]);
+    const hiddenPrefixSet = new Set((data.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean));
+    const byCode = new Map();
+    stockCategoryOptions.forEach((value) => {
+      const code = extractStockGroupCode(value);
+      if (!/^[A-Z]{3}$/.test(code) || hiddenPrefixSet.has(code)) return;
+      const canonicalValue = getCanonicalStockGroupLabel(code, value) || value;
+      byCode.set(code, { value: canonicalValue, code, label: canonicalValue });
+    });
+    return Array.from(byCode.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+  }, [stockCategoryOptions, data.hiddenStockGroupPrefixes]);
 
   const stockAllKnownCodes = useMemo(() => {
     return Array.from(
@@ -5053,7 +5215,7 @@ export default function App() {
 
   const stockPickerResults = useMemo(() => {
     const normalized = String(stockPickerQuery || "").trim().toLowerCase();
-    const source = buildStockBalanceRows(filteredData.stock || [], filteredData.stockMovements || []);
+    const source = buildStockBalanceRows(filteredData.stock || [], filteredData.stockMovements || [], stockCatalogEntries, data.hiddenStockGroupPrefixes || []);
     if (!normalized) return source;
     return source.filter((item) => {
       const parsed = parseStockItemLabel(item.item || "");
@@ -5224,6 +5386,7 @@ export default function App() {
         history: (historyRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, date: row.date, createdAt: row.created_at, obraName: row.obra_nome, stock: row.snapshot?.stock || [], maintenance: (row.snapshot?.maintenance || []).map((item) => calculateMaintenanceItem(item)), attendance: row.snapshot?.attendance || [] })),
         stockCategories: [],
         stockCodeCatalog: [],
+        hiddenStockGroupPrefixes: [],
       };
 
       const localBackup = normalizeStoredAppData(getStoredAppData());
@@ -5232,6 +5395,7 @@ export default function App() {
         ...nextData,
         stockCategories: localBackup?.stockCategories || initialData.stockCategories || ["Material"],
         stockCodeCatalog: localBackup?.stockCodeCatalog || initialData.stockCodeCatalog || [],
+        hiddenStockGroupPrefixes: localBackup?.hiddenStockGroupPrefixes || initialData.hiddenStockGroupPrefixes || [],
         stockResponsibles: localBackup?.stockResponsibles || initialData.stockResponsibles || [],
         attendanceDays: localBackup?.attendanceDays || initialData.attendanceDays || [],
         maintenanceRoles: nextData.maintenanceRoles.length ? nextData.maintenanceRoles : (localBackup?.maintenanceRoles || getStoredMaintenanceRoles(initialData.maintenanceRoles)),
@@ -5999,7 +6163,8 @@ export default function App() {
             ? (prev.stock || []).map((item) => sameId(item.id, currentItem.id) ? { ...item, quantity: nextQty, saldo: nextQty } : item)
             : [...(prev.stock || []), { ...currentItem, quantity: nextQty, saldo: nextQty }],
           stockMovements: [movement, ...(prev.stockMovements || [])],
-          stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
+          hiddenStockGroupPrefixes: Array.from(new Set((appData.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean))),
+    stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(movement.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
         };
       });
     }
@@ -6092,7 +6257,8 @@ export default function App() {
             ? { ...mv, type: payload.type, quantity: payload.quantity, note: payload.note, responsible: payload.responsible, date: payload.date }
             : mv
         ),
-        stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(payload.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
+        hiddenStockGroupPrefixes: Array.from(new Set((appData.hiddenStockGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean))),
+    stockResponsibles: Array.from(new Set([...(prev.stockResponsibles || []), normalizeResponsibleName(payload.responsible)].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
       }));
     }
 
@@ -6140,22 +6306,21 @@ export default function App() {
     const entry = getStockCatalogEntry(stockForm.code, stockCatalogEntries);
     const normalizedInputDescription = String(stockForm.item || "").trim() || entry?.description || "";
     const selectedCategory = String(stockForm.category || "").trim();
-    const preferredCategory = selectedCategory || entry?.category || "Material";
-    const canonical = canonicalizeStockEntry(
-      entry?.code || stockForm.code,
-      normalizedInputDescription,
-      preferredCategory
-    );
     const originalInputCode = String(stockForm.code || "").trim().toUpperCase();
-    const finalCode = canonical.code || originalInputCode;
-    const finalDescription = String(canonical.description || "").trim();
-    const finalCategory = String(canonical.category || "Material").trim() || "Material";
+    const aliasCode = STOCK_CODE_ALIAS_MAP[originalInputCode] || originalInputCode || String(entry?.code || "").trim().toUpperCase();
+    const finalCode = aliasCode;
+    const finalDescription = stripLeadingCodeFromDescription(normalizedInputDescription);
+    const finalCategory = String(selectedCategory || entry?.category || inferStockCategoryFromCode(finalCode, "Material") || "Material").trim() || "Material";
     const requiredPrefix = extractStockGroupCode(finalCategory);
     const isCatalogEditing = String(editingStockId || "").startsWith("catalog-") || (!editingStockId && stockEditModal);
     const sourceIds = Array.isArray(editingStockItemIds) && editingStockItemIds.length ? editingStockItemIds : (editingStockId && !isCatalogEditing ? [editingStockId] : []);
 
+    const codePrefix = extractStockGroupCode(finalCode);
     if (requiredPrefix && !/^[A-Z]{3}-\d{3}$/.test(finalCode)) {
       return setErrorMessage(`O código do material deve seguir o padrão ${requiredPrefix}-000.`);
+    }
+    if (requiredPrefix && codePrefix && codePrefix !== requiredPrefix) {
+      return setErrorMessage(`O grupo selecionado (${requiredPrefix}) não combina com o código informado (${finalCode}). Ajuste o código para ${requiredPrefix}-000 ou selecione o grupo correto.`);
     }
 
     const existingLocal = editingStockId && !isCatalogEditing
@@ -6337,6 +6502,133 @@ export default function App() {
     if (String(stockForm.category || "").trim() === normalized) {
       setStockForm((prev) => ({ ...prev, category: "Material" }));
     }
+  }
+
+
+  function openStockGroupEditModal() {
+    const firstGroup = stockGroupOptions[0]?.value || "";
+    const code = extractStockGroupCode(firstGroup);
+    setStockGroupEditForm({
+      oldCategory: firstGroup,
+      code,
+      name: getStockGroupFriendlyName(firstGroup),
+    });
+    setStockGroupEditModal(true);
+  }
+
+  function convertStockItemGroupLabel(label, oldCode, nextCode) {
+    const parsed = parseStockItemLabel(label || "");
+    const currentCode = String(parsed.code || "").trim().toUpperCase();
+    const description = String(parsed.description || label || "").trim();
+    if (!currentCode || extractStockGroupCode(currentCode) !== oldCode) return label;
+    const suffix = currentCode.match(/^[A-Z]{3}-(\d{1,})$/)?.[1] || "000";
+    const paddedSuffix = String(suffix).padStart(3, "0");
+    return buildStockItemLabel(`${nextCode}-${paddedSuffix}`, description);
+  }
+
+  async function saveStockGroupEdit() {
+    const oldCategory = String(stockGroupEditForm.oldCategory || "").trim();
+    const oldCode = extractStockGroupCode(oldCategory);
+    const nextCode = normalizeStockGroupCode(stockGroupEditForm.code);
+    const nextName = String(stockGroupEditForm.name || "").replace(/\s+/g, " ").trim();
+
+    if (!oldCode) return setErrorMessage("Selecione um grupo para editar.");
+    if (!/^[A-Z]{3}$/.test(nextCode)) return setErrorMessage("O código do grupo deve ter exatamente 3 letras.");
+    if (!nextName) return setErrorMessage("Informe o nome do grupo.");
+
+    const nextCategory = `${nextName} (${nextCode})`;
+    const matchesOldGroup = (value) => extractStockGroupCode(value) === oldCode;
+    const convertLabel = (label) => convertStockItemGroupLabel(label, oldCode, nextCode);
+
+    if (onlineMode && isSupabaseConfigured) {
+      const rowsToUpdate = (data.stock || [])
+        .filter((item) => matchesOldGroup(item.category) || extractStockGroupCode(parseStockItemLabel(item?.item || "")?.code) === oldCode)
+        .map((item) => ({
+          id: item.id,
+          item: convertLabel(item.item),
+          category: nextCategory,
+        }))
+        .filter((row) => row.id);
+
+      for (const row of rowsToUpdate) {
+        const { error } = await supabase
+          .from("stock_items")
+          .update({ item: row.item, category: row.category })
+          .eq("id", row.id);
+        if (error) return setErrorMessage(error.message);
+      }
+    }
+
+    commitDataUpdate((prev) => {
+      const hiddenPrefixSet = new Set([...(prev.hiddenStockGroupPrefixes || []), oldCode].map((item) => normalizeStockGroupCode(item)).filter(Boolean));
+      if (nextCode === oldCode) hiddenPrefixSet.delete(oldCode);
+
+      const nextStock = (prev.stock || []).map((item) => {
+        const parsed = parseStockItemLabel(item?.item || "");
+        const itemMatches = matchesOldGroup(item.category) || extractStockGroupCode(parsed.code) === oldCode;
+        if (!itemMatches) return item;
+        return {
+          ...item,
+          item: convertLabel(item.item),
+          category: nextCategory,
+        };
+      });
+
+      const nextCatalog = (prev.stockCodeCatalog || [])
+        .filter((entry) => !matchesOldGroup(entry.category) && extractStockGroupCode(entry.code) !== oldCode)
+        .concat(
+          (prev.stockCodeCatalog || [])
+            .filter((entry) => matchesOldGroup(entry.category) || extractStockGroupCode(entry.code) === oldCode)
+            .map((entry) => {
+              const parsedCode = String(entry.code || "").trim().toUpperCase();
+              const suffix = parsedCode.match(/^[A-Z]{3}-(\d{1,})$/)?.[1] || "000";
+              return {
+                ...entry,
+                code: `${nextCode}-${String(suffix).padStart(3, "0")}`,
+                category: nextCategory,
+              };
+            })
+        );
+
+      const stockDerivedCategories = nextStock.map((item) => item.category).filter(Boolean);
+      return {
+        ...prev,
+        stock: nextStock,
+        stockCodeCatalog: nextCatalog,
+        hiddenStockGroupPrefixes: Array.from(hiddenPrefixSet),
+        stockCategories: Array.from(new Set([
+          "Material",
+          ...(prev.stockCategories || []).filter((category) => !matchesOldGroup(category) && extractStockGroupCode(category) !== oldCode),
+          ...stockDerivedCategories,
+          nextCategory,
+        ].filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" })),
+      };
+    });
+
+    if (String(stockForm.category || "").trim() && matchesOldGroup(stockForm.category)) {
+      setStockForm((prev) => ({ ...prev, category: nextCategory, code: convertLabel(prev.code || "").split(" - ")[0] || prev.code }));
+    }
+
+    setStockGroupEditModal(false);
+    setStockGroupEditForm({ oldCategory: "", code: "", name: "" });
+    if (onlineMode && isSupabaseConfigured) await fetchAllData();
+  }
+
+  async function deleteStockGroup() {
+    const oldCategory = String(stockGroupEditForm.oldCategory || "").trim();
+    const oldCode = extractStockGroupCode(oldCategory);
+    if (!oldCode) return setErrorMessage("Selecione um grupo para deletar.");
+    if (!window.confirm(`Deseja deletar o grupo ${formatStockGroupOptionLabel(oldCategory)}?\n\nOs materiais já cadastrados não serão apagados. O grupo e seus códigos sairão das listas de seleção.`)) return;
+
+    commitDataUpdate((prev) => ({
+      ...prev,
+      hiddenStockGroupPrefixes: Array.from(new Set([...(prev.hiddenStockGroupPrefixes || []), oldCode].map((item) => normalizeStockGroupCode(item)).filter(Boolean))),
+      stockCategories: (prev.stockCategories || []).filter((category) => extractStockGroupCode(category) !== oldCode),
+      stockCodeCatalog: (prev.stockCodeCatalog || []).filter((entry) => extractStockGroupCode(entry.category) !== oldCode && extractStockGroupCode(entry.code) !== oldCode),
+    }));
+
+    setStockGroupEditModal(false);
+    setStockGroupEditForm({ oldCategory: "", code: "", name: "" });
   }
 
 
@@ -6768,7 +7060,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} onGoToComissionamento={() => setCurrentPage("comissionamento")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={() => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} hiddenStockGroupPrefixes={data.hiddenStockGroupPrefixes || []} onOpenGroupEdit={openStockGroupEditModal} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={(category = "Todas", query = "") => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado", { category, query })} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
@@ -6982,6 +7274,55 @@ export default function App() {
 
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setMaintenanceRoleModal(false)}>Fechar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={stockGroupEditModal} title="Editar grupo de materiais" onClose={() => setStockGroupEditModal(false)}>
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            Altere o código e o nome do grupo. Os materiais continuam com seus saldos, movimentações, mínimos, notas fiscais e valores unitários preservados.
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <Field label="Grupo atual">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                value={stockGroupEditForm.oldCategory}
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  setStockGroupEditForm({
+                    oldCategory: selected,
+                    code: extractStockGroupCode(selected),
+                    name: getStockGroupFriendlyName(selected),
+                  });
+                }}
+              >
+                <option value="">Selecione...</option>
+                {stockGroupOptions.map((group) => <option key={group.value} value={group.value}>{group.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Novo código do grupo">
+              <Input
+                value={stockGroupEditForm.code}
+                maxLength={3}
+                onChange={(e) => setStockGroupEditForm((prev) => ({ ...prev, code: normalizeStockGroupCode(e.target.value) }))}
+                placeholder="Ex.: SEV"
+              />
+            </Field>
+            <Field label="Novo nome do grupo">
+              <Input
+                value={stockGroupEditForm.name}
+                onChange={(e) => setStockGroupEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Ex.: Selantes e Vedações"
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button type="button" variant="danger" onClick={deleteStockGroup}><Trash2 className="h-4 w-4" /> Deletar grupo</Button>
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setStockGroupEditModal(false)}>Cancelar</Button>
+              <Button type="button" onClick={saveStockGroupEdit}>Salvar grupo</Button>
+            </div>
           </div>
         </div>
       </Modal>
