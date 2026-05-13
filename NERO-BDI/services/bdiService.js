@@ -22,6 +22,15 @@ function writeLocal(items) {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
 }
 
+function normalizeLocalModel(item) {
+  return {
+    ...item,
+    origem: item.origem || "local",
+    atualizadoEm: item.atualizadoEm || item.atualizado_em || new Date().toISOString(),
+    criadoEm: item.criadoEm || item.criado_em || new Date().toISOString(),
+  };
+}
+
 function toAppModel(row) {
   if (!row) return null;
 
@@ -29,6 +38,7 @@ function toAppModel(row) {
     id: row.id,
     nome: row.nome,
     obraId: row.obra_id || null,
+    custoDireto: row.resumo?.custo || "1000000",
     items: Array.isArray(row.items) ? row.items : [],
     resumo: row.resumo || {},
     observacoes: row.observacoes || "",
@@ -49,6 +59,50 @@ function toDbPayload(composicao) {
   };
 }
 
+function mergeCompositions(supabaseItems = [], localItems = []) {
+  const map = new Map();
+
+  [...localItems.map(normalizeLocalModel), ...supabaseItems].forEach((item) => {
+    if (!item) return;
+
+    const key = String(item.id || item.nome || Date.now());
+
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, item);
+      return;
+    }
+
+    const existingDate = new Date(existing.atualizadoEm || existing.atualizado_em || 0).getTime();
+    const itemDate = new Date(item.atualizadoEm || item.atualizado_em || 0).getTime();
+
+    if (itemDate >= existingDate) {
+      map.set(key, item);
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    const da = new Date(a.atualizadoEm || a.atualizado_em || 0).getTime();
+    const db = new Date(b.atualizadoEm || b.atualizado_em || 0).getTime();
+    return db - da;
+  });
+}
+
+function upsertLocal(composicao) {
+  const local = readLocal();
+  const registro = normalizeLocalModel(composicao);
+
+  const withoutSameId = local.filter((item) => item.id !== registro.id);
+  const withoutSameName = withoutSameId.filter(
+    (item) => String(item.nome || "").toLowerCase() !== String(registro.nome || "").toLowerCase()
+  );
+
+  writeLocal([registro, ...withoutSameName]);
+
+  return registro;
+}
+
 export function prepararComposicaoParaCarregar(composicao) {
   localStorage.setItem(LOAD_KEY, JSON.stringify(composicao));
 }
@@ -56,11 +110,9 @@ export function prepararComposicaoParaCarregar(composicao) {
 export function consumirComposicaoParaCarregar() {
   try {
     const raw = localStorage.getItem(LOAD_KEY);
-
     if (!raw) return null;
 
     const composicao = JSON.parse(raw);
-
     localStorage.removeItem(LOAD_KEY);
 
     return composicao;
@@ -71,6 +123,8 @@ export function consumirComposicaoParaCarregar() {
 }
 
 export async function listarComposicoesBDI() {
+  const local = readLocal().map(normalizeLocalModel);
+
   if (isOnlineDatabaseReady()) {
     const { data, error } = await supabase
       .from(TABLE_NAME)
@@ -78,17 +132,28 @@ export async function listarComposicoesBDI() {
       .order("atualizado_em", { ascending: false });
 
     if (!error) {
-      return (data || []).map(toAppModel);
+      const online = (data || []).map(toAppModel).filter(Boolean);
+      return mergeCompositions(online, local);
     }
 
-    console.warn("Falha Supabase. Usando localStorage.", error);
+    console.warn("Falha ao listar BDI no Supabase. Usando localStorage.", error);
   }
 
-  return readLocal();
+  return local;
 }
 
 export async function salvarComposicaoBDI(composicao) {
   const agora = new Date().toISOString();
+
+  const localDraft = {
+    ...composicao,
+    id: composicao.id || `bdi-${Date.now()}`,
+    origem: composicao.origem || "local",
+    criadoEm: composicao.criadoEm || agora,
+    atualizadoEm: agora,
+  };
+
+  let localRegistro = upsertLocal(localDraft);
 
   if (isOnlineDatabaseReady()) {
     const payload = toDbPayload(composicao);
@@ -114,49 +179,28 @@ export async function salvarComposicaoBDI(composicao) {
     }
 
     if (!result.error) {
-      return toAppModel(result.data);
+      const onlineRegistro = toAppModel(result.data);
+      upsertLocal(onlineRegistro);
+      return onlineRegistro;
     }
 
-    console.warn("Erro Supabase. Salvando localmente.", result.error);
+    console.warn("Falha ao salvar BDI no Supabase. Mantendo cópia local.", result.error);
   }
 
-  const local = readLocal();
-
-  const registro = {
-    ...composicao,
-    id: composicao.id || `bdi-${Date.now()}`,
-    origem: "local",
-    criadoEm: composicao.criadoEm || agora,
-    atualizadoEm: agora,
-  };
-
-  const semMesmoRegistro = local.filter(
-    (item) => item.id !== registro.id
-  );
-
-  writeLocal([registro, ...semMesmoRegistro]);
-
-  return registro;
+  return localRegistro;
 }
 
-export async function excluirComposicaoBDI(
-  id,
-  origem = "supabase"
-) {
-  if (isOnlineDatabaseReady() && origem === "supabase") {
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .delete()
-      .eq("id", id);
-
-    if (!error) return true;
-  }
-
+export async function excluirComposicaoBDI(id, origem = "supabase") {
   const local = readLocal();
+  writeLocal(local.filter((item) => item.id !== id));
 
-  writeLocal(
-    local.filter((item) => item.id !== id)
-  );
+  if (isOnlineDatabaseReady() && origem === "supabase") {
+    const { error } = await supabase.from(TABLE_NAME).delete().eq("id", id);
+
+    if (error) {
+      console.warn("Falha ao excluir BDI no Supabase. Excluído localmente.", error);
+    }
+  }
 
   return true;
 }
@@ -167,7 +211,7 @@ export async function duplicarComposicaoBDI(composicao) {
   const duplicada = {
     ...composicao,
     id: null,
-    nome: `${composicao.nome} - cópia`,
+    nome: `${composicao.nome || "Composição"} - cópia`,
     criadoEm: agora,
     atualizadoEm: agora,
     origem: undefined,

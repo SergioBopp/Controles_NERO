@@ -1,0 +1,76 @@
+export const bdiTemplates = [
+  {
+    id: "industrial",
+    nome: "BDI Industrial",
+    categoria: "Industrial",
+    descricao:
+      "Modelo recomendado para obras industriais, instalações elétricas e contratos técnicos de maior complexidade.",
+    resumo: {
+      custo: 1000000,
+      bdi: 32.5,
+      tributos: 13.15,
+      valorBdi: 325000,
+      precoVenda: 1325000,
+    },
+    items: [
+      { grupo: "Despesas Indiretas", descricao: "Administração central", percentual: "5,00", tipo: "numerador" },
+      { grupo: "Despesas Indiretas", descricao: "Administração local", percentual: "3,00", tipo: "numerador" },
+      { grupo: "Despesas Indiretas", descricao: "Mobilização / desmobilização", percentual: "2,50", tipo: "numerador" },
+      { grupo: "Riscos e Garantias", descricao: "Riscos operacionais", percentual: "3,00", tipo: "numerador" },
+      { grupo: "Riscos e Garantias", descricao: "Seguro e garantias", percentual: "1,50", tipo: "numerador" },
+      { grupo: "Resultado", descricao: "Lucro operacional", percentual: "8,00", tipo: "numerador" },
+      { grupo: "Tributos", descricao: "PIS", percentual: "0,65", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "COFINS", percentual: "3,00", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "ISS", percentual: "5,00", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "CPRB / INSS", percentual: "4,50", tipo: "denominador" },
+    ],
+  },
+  {
+    id: "fotovoltaico",
+    nome: "BDI Fotovoltaico",
+    categoria: "Energia Solar",
+    descricao:
+      "Modelo voltado para usinas, sistemas fotovoltaicos e contratos de geração distribuída.",
+    resumo: {
+      custo: 850000,
+      bdi: 28.9,
+      tributos: 11.5,
+      valorBdi: 245650,
+      precoVenda: 1095650,
+    },
+    items: [
+      { grupo: "Despesas Indiretas", descricao: "Engenharia e documentação técnica", percentual: "4,00", tipo: "numerador" },
+      { grupo: "Despesas Indiretas", descricao: "Logística e mobilização", percentual: "2,00", tipo: "numerador" },
+      { grupo: "Riscos e Garantias", descricao: "Garantias de performance", percentual: "2,00", tipo: "numerador" },
+      { grupo: "Resultado", descricao: "Lucro", percentual: "7,00", tipo: "numerador" },
+      { grupo: "Tributos", descricao: "PIS", percentual: "0,65", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "COFINS", percentual: "3,00", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "ISS", percentual: "3,50", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "CPRB / INSS", percentual: "4,35", tipo: "denominador" },
+    ],
+  },
+  {
+    id: "hospitalar",
+    nome: "BDI Hospitalar",
+    categoria: "Hospitalar",
+    descricao:
+      "Modelo para obras hospitalares, ambientes críticos e intervenções com maior exigência de rastreabilidade.",
+    resumo: {
+      custo: 1200000,
+      bdi: 38.2,
+      tributos: 13.15,
+      valorBdi: 458400,
+      precoVenda: 1658400,
+    },
+    items: [
+      { grupo: "Despesas Indiretas", descricao: "Qualidade e rastreabilidade", percentual: "6,00", tipo: "numerador" },
+      { grupo: "Despesas Indiretas", descricao: "Administração local ampliada", percentual: "4,00", tipo: "numerador" },
+      { grupo: "Riscos e Garantias", descricao: "Ambientes críticos", percentual: "5,00", tipo: "numerador" },
+      { grupo: "Resultado", descricao: "Lucro", percentual: "9,00", tipo: "numerador" },
+      { grupo: "Tributos", descricao: "PIS", percentual: "0,65", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "COFINS", percentual: "3,00", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "ISS", percentual: "5,00", tipo: "denominador" },
+      { grupo: "Tributos", descricao: "CPRB / INSS", percentual: "4,50", tipo: "denominador" },
+    ],
+  },
+];
