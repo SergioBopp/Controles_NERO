@@ -3693,6 +3693,7 @@ function AttendancePage({
   attendanceDayDate = getTodayISO(),
   attendanceDayClosedAt = "",
   onStartAttendanceDay,
+  onStartRetroactiveAttendanceDay,
   onCloseAttendanceDay,
 }) {
   const dayCanEdit = attendanceDayStatus === "open";
@@ -3749,6 +3750,13 @@ function AttendancePage({
               disabled={dayCanEdit && totalPresent === 0}
             >
               Iniciar dia
+            </Button>
+            <Button
+              className="border-amber-300 text-amber-800 hover:bg-amber-50"
+              variant="outline"
+              onClick={onStartRetroactiveAttendanceDay}
+            >
+              Lançamento retroativo
             </Button>
             <Button
               className="border-amber-300 text-amber-800 hover:bg-amber-50"
@@ -6542,6 +6550,88 @@ export default function App() {
     });
   }
 
+  async function startRetroactiveAttendanceDay() {
+    if (!obraAtual) return;
+
+    const input = document.createElement("input");
+    input.type = "date";
+    input.value = currentAttendanceDay?.date || getTodayISO();
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    document.body.appendChild(input);
+
+    const removerInput = () => {
+      if (document.body.contains(input)) {
+        document.body.removeChild(input);
+      }
+    };
+
+    input.onchange = async () => {
+      const dataRetroativa = input.value;
+      removerInput();
+
+      if (!dataRetroativa) return;
+
+      const dataRetroativaBR = dataRetroativa.split("-").reverse().join("/");
+
+      const existeHistorico = (data.history || []).some(
+        (entry) => sameId(entry?.obraId, obraAtual.id) && hasSameCalendarDay(entry?.date, dataRetroativa)
+      );
+
+      if (existeHistorico) {
+        window.alert("Já existe histórico fechado para esta data.");
+        return;
+      }
+
+      const hasAttendance = (filteredData.attendance || []).length > 0;
+      const confirmar = window.confirm(
+        hasAttendance
+          ? `Abrir lançamento retroativo em ${dataRetroativaBR}?\n\nAs presenças ABERTAS do dia atual serão limpas apenas para iniciar este lançamento retroativo.\n\nO histórico já fechado e os demais módulos do NERO não serão apagados.`
+          : `Abrir lançamento retroativo em ${dataRetroativaBR}?`
+      );
+
+      if (!confirmar) return;
+
+      if (onlineMode && isSupabaseConfigured) {
+        const { error } = await supabase
+          .from("attendance_records")
+          .delete()
+          .eq("obra_id", obraAtual.id);
+
+        if (error) return setErrorMessage(error.message);
+      }
+
+      commitDataUpdate((prev) => {
+        const withoutAttendance = (prev.attendance || []).filter((item) => !sameId(item.obraId, obraAtual.id));
+        const withoutDay = (prev.attendanceDays || []).filter((day) => !sameId(day.obraId, obraAtual.id));
+
+        return {
+          ...prev,
+          attendance: withoutAttendance,
+          attendanceDays: [
+            ...withoutDay,
+            {
+              obraId: obraAtual.id,
+              date: dataRetroativa,
+              status: "open",
+              closedAt: "",
+              retroactive: true,
+              retroactiveCreatedAt: new Date().toISOString(),
+            },
+          ],
+        };
+      });
+    };
+
+    input.onblur = () => {
+      window.setTimeout(removerInput, 500);
+    };
+
+    input.showPicker?.();
+    input.click();
+  }
+
   async function closeAttendanceDay() {
     if (!obraAtual) return;
     if (currentAttendanceDay?.status === "closed") return;
@@ -7824,7 +7914,7 @@ export default function App() {
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} onGoToComissionamento={() => setCurrentPage("comissionamento")} />}
                   {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} hiddenStockGroupPrefixes={data.hiddenStockGroupPrefixes || []} onOpenGroupEdit={openStockGroupEditModal} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={(category = "Todas", query = "") => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado", { category, query })} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
-                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
+                  {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onStartRetroactiveAttendanceDay={startRetroactiveAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "history" && <HistoryPage history={filteredData.history} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
                   {currentPage === "comissionamento" && <ComissionamentoApp onBackHome={() => setCurrentPage("dashboard")} />}
