@@ -2932,12 +2932,18 @@ function DashboardPage({ data, obraAtual, historyCountForObra, onGoToStock, onGo
   );
 }
 
-function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], onBack, onAdd, onDelete, onMove, onView, onEdit, onEditMovement, onDeleteMovement, onOpenHeaderView, onOpenHeaderEdit, onOpenGroupEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
+function StockPage({ stock, stockMovements, hiddenStockGroupPrefixes = [], returnCategoryRequest, onBack, onAdd, onDelete, onMove, onView, onEdit, onEditMovement, onDeleteMovement, onOpenHeaderView, onOpenHeaderEdit, onOpenGroupEdit, onExportMovements, onExportStockPosition, onRunLegacyCleanup, onRegularizeInitialStock, cleanupFeedback = "" }) {
   const stockBalanceRows = buildStockBalanceRows(stock, stockMovements, STOCK_CODE_CATALOG, hiddenStockGroupPrefixes || []);
   const [reportQuery, setReportQuery] = useState("");
   const [reportCategory, setReportCategory] = useState("Todas");
   const [cardQuery, setCardQuery] = useState("");
   const [cardCategory, setCardCategory] = useState("Todas");
+
+  useEffect(() => {
+    if (!returnCategoryRequest?.nonce) return;
+    setCardQuery("");
+    setCardCategory(returnCategoryRequest.category || "Todas");
+  }, [returnCategoryRequest?.nonce]);
   const [movementsReportOpen, setMovementsReportOpen] = useState(false);
   const [movementsReportQuery, setMovementsReportQuery] = useState("");
   const [movementsReportType, setMovementsReportType] = useState("Todos");
@@ -5730,6 +5736,8 @@ export default function App() {
   const [maintenanceRoleForm, setMaintenanceRoleForm] = useState({ name: "", daily: 0 });
   const [obraForm, setObraForm] = useState({ nome: "", cliente: "", local: "", status: "Ativa", dataInicio: getTodayISO(), observacao: "" });
   const [stockForm, setStockForm] = useState({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: "", invoice: "", price: 0, remarks: "" });
+  const [stockPostEditChoice, setStockPostEditChoice] = useState({ open: false, category: "Todas", label: "" });
+  const [stockReturnCategoryRequest, setStockReturnCategoryRequest] = useState({ category: "Todas", nonce: 0 });
   const [stockMovementModal, setStockMovementModal] = useState(false);
   const [stockMovementForm, setStockMovementForm] = useState({ itemId: "", type: "entrada", quantity: 0, note: "", responsible: "", date: getTodayISO() });
   const [stockMovementEditModal, setStockMovementEditModal] = useState(false);
@@ -7306,11 +7314,27 @@ export default function App() {
       }));
     }
 
+    const savedFromEditModal = stockEditModal;
+    const savedFinalCategory = finalCategory;
+    const savedGroupCode = extractStockGroupCode(finalCategory);
+    const savedFilterCategory =
+      stockGroupOptions.find((option) => option.code === savedGroupCode)?.value ||
+      savedFinalCategory;
+    const savedGroupLabel = savedGroupCode || formatStockGroupOptionLabel(savedFilterCategory) || savedFilterCategory || "selecionado";
+
     setStockModal(false);
     setStockEditModal(false);
     setEditingStockId("");
     setEditingStockItemIds([]);
     setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" });
+
+    if (savedFromEditModal) {
+      setStockPostEditChoice({
+        open: true,
+        category: savedFilterCategory,
+        label: savedGroupLabel,
+      });
+    }
   }
 
   function addStockCategory() {
@@ -7912,7 +7936,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={currentPage} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
                   {currentPage === "dashboard" && <DashboardPage data={filteredData} obraAtual={obraAtual} historyCountForObra={filteredData.history.length} onGoToStock={() => setCurrentPage("stock")} onGoToMaintenance={() => setCurrentPage("maintenance")} onGoToAttendance={() => setCurrentPage("attendance")} onGoToDiarias={() => setCurrentPage("diarias")} onGoToHistory={() => setCurrentPage("history")} onGoToComissionamento={() => setCurrentPage("comissionamento")} />}
-                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} hiddenStockGroupPrefixes={data.hiddenStockGroupPrefixes || []} onOpenGroupEdit={openStockGroupEditModal} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={(category = "Todas", query = "") => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado", { category, query })} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
+                  {currentPage === "stock" && <StockPage stock={filteredData.stock} stockMovements={filteredData.stockMovements || []} returnCategoryRequest={stockReturnCategoryRequest} onBack={() => setCurrentPage("dashboard")} onAdd={() => { setEditingStockId(""); setEditingStockItemIds([]); setStockForm({ code: "", item: "", unit: "un", quantity: 0, min: 0, category: stockGroupOptions[0]?.value || "", invoice: "", price: 0, remarks: "" }); setStockModal(true); }} onDelete={deleteStockItem} onMove={openStockMovementModal} onView={openStockViewModal} onEdit={openStockEditModal} onEditMovement={openStockMovementEditor} onDeleteMovement={deleteStockMovement} onOpenHeaderView={() => openStockPickerModal("view")} onOpenHeaderEdit={() => openStockPickerModal("edit")} hiddenStockGroupPrefixes={data.hiddenStockGroupPrefixes || []} onOpenGroupEdit={openStockGroupEditModal} onExportMovements={() => exportStockMovementsPdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado")} onExportStockPosition={(category = "Todas", query = "") => exportStockBalancePdf(filteredData.stock, filteredData.stockMovements || [], obraAtual, "Almoxarifado", { category, query })} onRunLegacyCleanup={runDefinitiveLegacyCleanup} onRegularizeInitialStock={regularizeInitialStockBalances} cleanupFeedback={legacyCleanupFeedback} />}
                   {currentPage === "maintenance" && (!selectedMaintenanceArea ? <MaintenanceAreaChooser selectedArea={selectedMaintenanceArea} onSelectArea={(area) => setSelectedMaintenanceArea(area)} onBack={() => setCurrentPage("dashboard")} maintenanceItems={filteredData.maintenance} /> : <MaintenancePage items={filteredMaintenance} search={search} setSearch={setSearch} onBack={() => setCurrentPage("dashboard")} onAdd={openNewMaintenanceModal} onDelete={deleteMaintenanceOrder} onEdit={openMaintenanceEditor} onView={openMaintenanceDetails} onManageRoles={() => setMaintenanceRoleModal(true)} onExportReport={() => exportMaintenanceLandscapePdf(filteredMaintenance, obraAtual)} onExportOSPdf={(item) => exportMaintenanceOSPdf(item, obraAtual)} selectedArea={selectedMaintenanceArea} onResetArea={() => setSelectedMaintenanceArea("")} maintenanceRolesCount={data.maintenanceRoles?.length || 0} />)}
                   {currentPage === "attendance" && <AttendancePage attendance={filteredData.attendance} companies={filteredData.companies} roles={filteredData.roles} onBack={() => setCurrentPage("dashboard")} onAddCompany={() => { setEditingCompanyId(""); setCompanyForm({ name: "", city: "" }); setCompanyModal(true); }} onDeletePresence={deleteAttendanceRecord} onDeleteCompany={deleteCompany} onDeleteRole={deleteRole} onEditRole={openRoleEditModal} onEditAttendance={openAttendanceEdit} onDeleteCompanySelector={() => openAttendanceCompanyAction("delete")} onEditCompanySelector={() => openAttendanceCompanyAction("edit")} onOpenNewRoleForCompany={(company) => { setEditingRoleId(""); setRoleForm({ companyId: String(company?.id || ""), name: "" }); setRoleModal(true); }} onOpenNewAttendanceForRole={openAttendanceCreateForRole} attendanceDayStatus={currentAttendanceDay?.status || "not_started"} attendanceDayDate={currentAttendanceDay?.date || getTodayISO()} attendanceDayClosedAt={currentAttendanceDay?.closedAt || ""} onStartAttendanceDay={startAttendanceDay} onStartRetroactiveAttendanceDay={startRetroactiveAttendanceDay} onCloseAttendanceDay={closeAttendanceDay} />}
                   {currentPage === "diarias" && <DiariasPageIntegrada onBack={() => setCurrentPage("dashboard")} obraAtual={obraAtual} />}
@@ -8182,6 +8206,49 @@ export default function App() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        open={stockPostEditChoice.open}
+        title="Material alterado com sucesso"
+        onClose={() => setStockPostEditChoice({ open: false, category: "Todas", label: "" })}
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
+            A alteração foi salva. Escolha para onde deseja voltar.
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Button
+              className="h-12"
+              onClick={() => {
+                setStockReturnCategoryRequest({
+                  category: stockPostEditChoice.category || "Todas",
+                  nonce: Date.now(),
+                });
+                setStockPostEditChoice({ open: false, category: "Todas", label: "" });
+              }}
+            >
+              Voltar ao grupo {stockPostEditChoice.label || ""}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-12"
+              onClick={() => {
+                setStockReturnCategoryRequest({
+                  category: "Todas",
+                  nonce: Date.now(),
+                });
+                setStockPostEditChoice({ open: false, category: "Todas", label: "" });
+              }}
+            >
+              Voltar à lista geral
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+
 
       <Modal open={stockModal || stockEditModal} title={stockEditModal ? "Editar material" : "Novo material"} onClose={() => { setStockModal(false); setStockEditModal(false); setEditingStockId(""); setEditingStockItemIds([]); setStockCodeFeedback(""); }}>
         <div className="space-y-5">
