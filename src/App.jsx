@@ -1573,6 +1573,20 @@ function hasSameCalendarDay(value, isoDate) {
   return String(value).slice(0, 10) === String(isoDate).slice(0, 10);
 }
 
+function isTemporaryStockId(value) {
+  const id = String(value || "").trim();
+  if (!id) return true;
+
+  return (
+    id.startsWith("restore-") ||
+    id.startsWith("catalog-") ||
+    id.startsWith("tmp-") ||
+    id.startsWith("temp-") ||
+    id.startsWith("local-") ||
+    id.startsWith("stk-")
+  );
+}
+
 function prepareNextDayData(appData, todayIso) {
   const history = Array.isArray(appData?.history) ? appData.history : [];
   const alreadyClosedToday = history.some((entry) => hasSameCalendarDay(entry?.date, todayIso));
@@ -7221,13 +7235,23 @@ export default function App() {
 
       if (editingStockId && !isCatalogEditing) {
         const primaryId = sourceIds[0] || editingStockId;
-        const duplicateIds = sourceIds.slice(1);
+        const duplicateIds = sourceIds.slice(1).filter((id) => !isTemporaryStockId(id));
 
-        const { error } = await supabase
-          .from("stock_items")
-          .update(dbPayload)
-          .eq("id", primaryId);
-        if (error) return setErrorMessage(error.message);
+        if (isTemporaryStockId(primaryId)) {
+          const { error: insertRestoredError } = await supabase.from("stock_items").insert({
+            obra_id: payload.obraId,
+            ...dbPayload,
+          });
+
+          if (insertRestoredError) return setErrorMessage(insertRestoredError.message);
+        } else {
+          const { error } = await supabase
+            .from("stock_items")
+            .update(dbPayload)
+            .eq("id", primaryId);
+
+          if (error) return setErrorMessage(error.message);
+        }
 
         if (duplicateIds.length) {
           const { error: duplicateError } = await supabase.from("stock_items").update({
@@ -7255,7 +7279,6 @@ export default function App() {
           if (updateExistingError) return setErrorMessage(updateExistingError.message);
         } else {
           const { error: insertError } = await supabase.from("stock_items").insert({
-            id: payload.id,
             obra_id: payload.obraId,
             ...dbPayload,
           });
