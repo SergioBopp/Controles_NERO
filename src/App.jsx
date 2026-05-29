@@ -4791,36 +4791,48 @@ async function diariasLoadLancamentos(semanaId) {
 }
 
 async function diariasLoadNomesCadastrados() {
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from("diarias_lancamentos")
-      .select("nome, cargo, diaria, cpf, pix, created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    const mapa = new Map();
-    for (const row of data || []) {
-      const nome = String(row?.nome || "").trim();
-      if (!nome) continue;
-      const chave = nome.toLowerCase();
-      if (!mapa.has(chave)) mapa.set(chave, row);
-    }
-    return Array.from(mapa.values()).sort((a, b) =>
-      String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", { sensitivity: "base" })
-    );
-  }
-  const all = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.lancamentos) || "[]");
-  const mapa = new Map();
-  for (const row of all) {
-    const nome = String(row?.nome || "").trim();
-    if (!nome) continue;
-    const chave = nome.toLowerCase();
-    if (!mapa.has(chave)) mapa.set(chave, row);
-  }
-  return Array.from(mapa.values()).sort((a, b) =>
-    String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", { sensitivity: "base" })
-  );
-}
+  const normalizarCadastroDiaria = (row = {}) => {
+    const nome = String(row.nome || row.nome_completo || row.funcionario || row.colaborador || "").trim();
+    const cargo = String(row.cargo || row.cargo_padrao || row.funcao || "").trim();
+    const diaria = Number(row.diaria ?? row.diaria_base ?? row.valor_diaria ?? row.valor ?? 0);
+    const cpf = String(row.cpf || row.documento || "").trim();
+    const telefone = String(row.telefone || row.celular || row.whatsapp || "").trim();
+    const pixTipo = String(row.pix_tipo || row.tipo_pix || row.tipo_chave_pix || "").trim();
+    const pix = String(row.pix || row.chave_pix || row.pix_chave || row.chave || "").trim();
+    return { ...row, nome, cargo, diaria, cpf, telefone, pixTipo, pix, created_at: row.created_at || row.criado_em || row.updated_at || "" };
+  };
 
+  const consolidar = (listas = []) => {
+    const mapa = new Map();
+    for (const row of listas.flat()) {
+      const item = normalizarCadastroDiaria(row);
+      if (!item.nome) continue;
+      const chave = item.cpf ? `cpf:${item.cpf.replace(/\D/g, "")}` : `nome:${item.nome.toLowerCase()}`;
+      const atual = mapa.get(chave);
+      mapa.set(chave, atual ? {
+        ...atual,
+        ...Object.fromEntries(Object.entries(item).filter(([, value]) => value !== "" && value !== 0 && value !== null && value !== undefined)),
+      } : item);
+    }
+    return Array.from(mapa.values()).sort((a, b) => String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", { sensitivity: "base" }));
+  };
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.from("diarias_lancamentos").select("*").order("created_at", { ascending: false });
+      if (!error) return consolidar([data || []]);
+    } catch (err) {
+      console.warn("Diárias: não foi possível carregar nomes a partir dos lançamentos.", err);
+    }
+  }
+
+  return consolidar([
+    JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.lancamentos) || "[]"),
+    JSON.parse(localStorage.getItem("nero_diarias_integradas_cadastros") || "[]"),
+    JSON.parse(localStorage.getItem("nero_diarias_cadastros") || "[]"),
+    JSON.parse(localStorage.getItem("diarias_cadastros") || "[]"),
+  ]);
+}
 
 async function diariasCreateOrSelectSemana(semanaInicio, semanaFim) {
   if (isSupabaseConfigured) {
@@ -4840,22 +4852,34 @@ async function diariasCreateOrSelectSemana(semanaInicio, semanaFim) {
 }
 
 async function diariasSaveCargo(payload, editId = "") {
+  const cargoNome = String(payload?.cargo || "").trim();
+  const diariaValor = parseNumberBR(payload?.diaria);
+
+  if (!cargoNome || !diariaValor) throw new Error("Informe cargo e diária. Use 200 ou 200,00.");
+
+  const cleanPayload = { cargo: cargoNome, diaria: diariaValor };
+
   if (isSupabaseConfigured) {
     if (editId) {
-      const { error } = await supabase.from("diarias_cargos").update(payload).eq("id", editId);
+      const { error } = await supabase.from("diarias_cargos").update(cleanPayload).eq("id", editId);
       if (error) throw error;
       return;
     }
-    const { error } = await supabase.from("diarias_cargos").insert(payload);
-    if (error) throw error;
+
+    const { error } = await supabase.from("diarias_cargos").insert(cleanPayload);
+    if (!error) return;
+
+    const { error: fallbackError } = await supabase.from("diarias_cargos").insert({ id: `cargo-${Date.now()}`, ...cleanPayload });
+    if (fallbackError) throw new Error(fallbackError.message || error.message || "Erro ao salvar cargo.");
     return;
   }
+
   const cargos = JSON.parse(localStorage.getItem(DIARIAS_LOCAL_KEYS.cargos) || "[]");
   if (editId) {
-    const next = cargos.map((row) => String(row.id) === String(editId) ? { ...row, ...payload } : row);
+    const next = cargos.map((row) => String(row.id) === String(editId) ? { ...row, ...cleanPayload } : row);
     localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify(next));
   } else {
-    localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify([...cargos, { id: `cargo-${Date.now()}`, ...payload }]));
+    localStorage.setItem(DIARIAS_LOCAL_KEYS.cargos, JSON.stringify([...cargos, { id: `cargo-${Date.now()}`, ...cleanPayload }]));
   }
 }
 
@@ -5176,10 +5200,11 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
   const [semanaAtivaId, setSemanaAtivaId] = useState("");
   const [lancamentos, setLancamentos] = useState([]);
   const [nomesCadastrados, setNomesCadastrados] = useState([]);
+  const [nomeDropdownOpen, setNomeDropdownOpen] = useState(false);
   const [filtro, setFiltro] = useState("");
   const [cargoEditandoId, setCargoEditandoId] = useState("");
   const [cargoForm, setCargoForm] = useState({ cargo: "", diaria: "" });
-  const [form, setForm] = useState({ semanaInicio: "", semanaFim: "", nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 });
+  const [form, setForm] = useState({ semanaInicio: "", semanaFim: "", nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", telefone: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 });
   const [authLoading, setAuthLoading] = useState(true);
   const [diariasSession, setDiariasSession] = useState(null);
   const [authProfile, setAuthProfile] = useState(null);
@@ -5187,10 +5212,11 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
   const [loginPassword, setLoginPassword] = useState("");
 
   useEffect(() => {
-    if (form.tipoPix === "cpf") {
-      setForm((prev) => ({ ...prev, pix: prev.cpf }));
+    if (form.pixTipo === "cpf") {
+      setError("");
+                            setForm((prev) => ({ ...prev, pix: prev.cpf }));
     }
-  }, [form.cpf, form.tipoPix]);
+  }, [form.cpf, form.pixTipo]);
 
   const semanaAtiva = useMemo(() => semanas.find((row) => String(row.id) === String(semanaAtivaId)) || null, [semanas, semanaAtivaId]);
   const semanaFechada = semanaAtiva?.status === "fechada";
@@ -5305,6 +5331,22 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
       setNomesCadastrados(nomesData || []);
       const alvo = preferSemanaId || semanaAtivaId || semanasData.find((row) => row.status === "aberta")?.id || semanasData[0]?.id || "";
       setSemanaAtivaId(alvo ? String(alvo) : "");
+      
+      setForm((prev) => ({
+        ...prev,
+        nome: "",
+        cargoPadrao: "",
+        cargo: "",
+        diaria: "",
+        cpf: "",
+        telefone: "",
+        pixTipo: "",
+        pix: "",
+        dia: 0,
+        noite: 0,
+        sabado: 0,
+        domingoFeriado: 0,
+      }));
       if (alvo) {
         const list = await diariasLoadLancamentos(alvo);
         setLancamentos(list || []);
@@ -5324,16 +5366,15 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
   }
 
   useEffect(() => {
-    if (!diariasSession?.user?.id || !isDiariasAdmin) return;
     recarregarBase();
-  }, [diariasSession?.user?.id, isDiariasAdmin]);
+  }, []);
 
   useEffect(() => {
-    if (!diariasSession?.user?.id || !isDiariasAdmin || !semanaAtivaId) return;
+    if (!semanaAtivaId) return;
     diariasLoadLancamentos(semanaAtivaId)
       .then(setLancamentos)
       .catch((err) => setError(err.message || "Erro ao carregar lançamentos."));
-  }, [diariasSession?.user?.id, isDiariasAdmin, semanaAtivaId]);
+  }, [semanaAtivaId]);
 
   const listaFiltrada = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
@@ -5350,9 +5391,37 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
       cargo: String(item?.cargo || "").trim(),
       diaria: Number(item?.diaria || 0),
       cpf: String(item?.cpf || "").trim(),
-      pix: String(item?.pix || "").trim(),
+      telefone: String(item?.telefone || item?.celular || item?.whatsapp || "").trim(),
+      pixTipo: String(item?.pixTipo || item?.pix_tipo || item?.tipo_pix || item?.tipo_chave_pix || "").trim(),
+      pix: String(item?.pix || item?.chave_pix || item?.pix_chave || item?.chave || "").trim(),
     })).filter((item) => item.nome);
   }, [nomesCadastrados]);
+
+  const nomesFiltrados = useMemo(() => {
+    const termo = String(form.nome || "").trim().toLowerCase();
+    if (!termo) return nomesOptions.slice(0, 12);
+
+    return nomesOptions
+      .filter((item) => String(item.nome || "").toLowerCase().startsWith(termo))
+      .slice(0, 12);
+  }, [form.nome, nomesOptions]);
+
+  function aplicarNomeCadastrado(item) {
+    if (!item) return;
+
+    setForm((prev) => ({
+      ...prev,
+      nome: item.nome || prev.nome,
+      cargo: item.cargo || prev.cargo,
+      diaria: item.diaria || prev.diaria,
+      cpf: item.cpf || prev.cpf,
+      telefone: item.telefone || prev.telefone,
+      pixTipo: String(item.pixTipo || prev.pixTipo || "").toLowerCase(),
+      pix: item.pix || prev.pix,
+    }));
+
+    setNomeDropdownOpen(false);
+  }
 
 
   async function handleCriarOuSelecionarSemana() {
@@ -5367,17 +5436,35 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
   }
 
   async function handleSalvarCargo(e) {
-    e.preventDefault();
-    if (!cargoForm.cargo.trim() || !Number(cargoForm.diaria || 0)) return setError("Informe cargo e diária.");
-    setSaving(true); setError("");
+    e?.preventDefault?.();
+
+    const cargoNome = String(cargoForm.cargo || "").trim();
+    const diariaValor = parseNumberBR(cargoForm.diaria);
+
+    if (!cargoNome || !diariaValor) {
+      setError("Informe cargo e diária. Use 200 ou 200,00.");
+      window.alert("Informe cargo e diária. Use 200 ou 200,00.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
     try {
-      await diariasSaveCargo({ cargo: cargoForm.cargo.trim(), diaria: Number(cargoForm.diaria || 0) }, cargoEditandoId);
+      await diariasSaveCargo({ cargo: cargoNome, diaria: diariaValor }, cargoEditandoId);
       setCargoForm({ cargo: "", diaria: "" });
       setCargoEditandoId("");
-      await recarregarBase(semanaAtivaId);
+      setCargos(await diariasLoadCargos());
+      if (semanaAtivaId) setLancamentos(await diariasLoadLancamentos(semanaAtivaId));
+      setTab("cargos");
+      window.alert(`Cargo "${cargoNome}" salvo com sucesso.`);
     } catch (err) {
-      console.error(err); setError(err.message || "Erro ao salvar cargo.");
-    } finally { setSaving(false); }
+      console.error("Erro ao salvar cargo em Diárias:", err);
+      setError(err.message || "Erro ao salvar cargo.");
+      window.alert(`Não foi possível salvar o cargo: ${err.message || "erro desconhecido"}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleExcluirCargo(id) {
@@ -5393,24 +5480,63 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
 
   async function handleSalvarLancamento(e) {
     e.preventDefault();
+    setError("");
+
     if (!semanaAtiva) return setError("Crie ou selecione uma semana primeiro.");
     if (semanaFechada) return setError("A semana está fechada.");
+
     const diariaValor = parseNumberBR(form.diaria);
     const diaValor = parseNumberBR(form.dia);
     const noiteValor = parseNumberBR(form.noite);
     const sabadoValor = parseNumberBR(form.sabado);
     const domingoFeriadoValor = parseNumberBR(form.domingoFeriado);
-    if (!form.nome.trim() || !form.cargo.trim() || !diariaValor || !form.pix.trim()) return setError("Preencha nome, cargo, diária e a chave PIX.");
-    if (String(form.cpf || "").replace(/\D/g, "").length !== 11) return setError("Informe um CPF válido.");
-    if ([diaValor, noiteValor, sabadoValor, domingoFeriadoValor].every((n) => Number(n || 0) === 0)) return setError("Informe ao menos uma diária.");
-    setSaving(true); setError("");
+
+    const nomeValor = String(form.nome || "").trim();
+    const cargoValor = String(form.cargo || form.cargoPadrao || "").trim();
+    const cpfValor = String(form.cpf || "").trim();
+    const telefoneValor = String(form.telefone || "").trim();
+    const pixTipoValor = String(form.pixTipo || "").trim().toLowerCase();
+
+    let pixValor = String(form.pix || "").trim();
+    if (!pixValor && pixTipoValor === "cpf") pixValor = cpfValor;
+    if (!pixValor && pixTipoValor === "celular") pixValor = telefoneValor;
+
+    if (!nomeValor || !cargoValor || !diariaValor || !pixValor) {
+      return setError("Preencha nome, cargo, diária e a chave PIX.");
+    }
+
+    if (String(cpfValor || "").replace(/\D/g, "").length !== 11) {
+      return setError("Informe um CPF válido.");
+    }
+
+    if ([diaValor, noiteValor, sabadoValor, domingoFeriadoValor].every((n) => Number(n || 0) === 0)) {
+      return setError("Informe ao menos uma diária.");
+    }
+
+    setSaving(true);
+
     try {
-      await diariasSaveLancamento({ semana_id: semanaAtiva.id, nome: form.nome.trim(), cargo: form.cargo.trim(), diaria: diariaValor, cpf: form.cpf, pix: form.pix.trim(), dia: diaValor, noite: noiteValor, sabado: sabadoValor, domingo_feriado: domingoFeriadoValor });
-      setForm((prev) => ({ ...prev, nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 }));
+      await diariasSaveLancamento({
+        semana_id: semanaAtiva.id,
+        nome: nomeValor,
+        cargo: cargoValor,
+        diaria: diariaValor,
+        cpf: cpfValor,
+        pix: pixValor,
+        dia: diaValor,
+        noite: noiteValor,
+        sabado: sabadoValor,
+        domingo_feriado: domingoFeriadoValor,
+      });
+
+      setForm((prev) => ({ ...prev, nome: "", cargoPadrao: "", cargo: "", diaria: "", cpf: "", telefone: "", pixTipo: "", pix: "", dia: 0, noite: 0, sabado: 0, domingoFeriado: 0 }));
       await recarregarBase(semanaAtivaId);
     } catch (err) {
-      console.error(err); setError(err.message || "Erro ao salvar lançamento.");
-    } finally { setSaving(false); }
+      console.error(err);
+      setError(err.message || "Erro ao salvar lançamento.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleExcluirLancamento(id) {
@@ -5526,38 +5652,59 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
                 <form className="space-y-4" onSubmit={handleSalvarLancamento}>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     <Field label="Nome">
-                      <>
+                      <div className="relative">
                         <Input
-                          list="diarias-nomes-cadastrados"
                           value={form.nome}
+                          onFocus={() => setNomeDropdownOpen(true)}
+                          onBlur={() => window.setTimeout(() => setNomeDropdownOpen(false), 180)}
                           onChange={(e) => {
                             const valor = e.target.value;
                             const encontrado = nomesOptions.find((item) => item.nome.toLowerCase() === valor.trim().toLowerCase());
+
                             setForm((prev) => ({
                               ...prev,
                               nome: valor,
                               cargo: encontrado?.cargo || prev.cargo,
                               diaria: encontrado?.diaria || prev.diaria,
                               cpf: encontrado?.cpf || prev.cpf,
+                              telefone: encontrado?.telefone || prev.telefone,
+                              pixTipo: encontrado?.pixTipo || prev.pixTipo,
                               pix: encontrado?.pix || prev.pix,
                             }));
+
+                            setNomeDropdownOpen(true);
                           }}
                           placeholder="Digite ou selecione um nome"
                           disabled={semanaFechada}
                         />
-                        <datalist id="diarias-nomes-cadastrados">
-                          {nomesOptions.map((item) => (
-                            <option key={item.nome} value={item.nome}>
-                              {item.cargo ? `${item.nome} - ${item.cargo}` : item.nome}
-                            </option>
-                          ))}
-                        </datalist>
-                      </>
+
+                        {nomeDropdownOpen && !semanaFechada && nomesFiltrados.length ? (
+                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+                            {nomesFiltrados.map((item) => (
+                              <button
+                                key={`${item.nome}-${item.cpf || item.pix || item.cargo}`}
+                                type="button"
+                                className="w-full px-4 py-3 text-left text-sm hover:bg-emerald-50 border-b border-slate-100 last:border-b-0"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  aplicarNomeCadastrado(item);
+                                }}
+                              >
+                                <div className="font-semibold text-slate-900">{item.nome}</div>
+                                <div className="text-xs text-slate-500">
+                                  {[item.cargo, item.cpf, item.telefone].filter(Boolean).join(" • ")}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     </Field>
                     <Field label="Cargo padrão"><SelectField value={form.cargoPadrao} onChange={(value) => { const cargo = cargos.find((row) => row.cargo === value); setForm((prev) => ({ ...prev, cargoPadrao: value, cargo: cargo?.cargo || prev.cargo, diaria: cargo?.diaria || prev.diaria })); }} options={[{ value: "", label: "Selecionar" }, ...cargos.map((row) => ({ value: row.cargo, label: row.cargo }))]} /></Field>
                     <Field label="Cargo"><Input value={form.cargo} onChange={(e) => setForm((prev) => ({ ...prev, cargo: e.target.value }))} disabled={semanaFechada} /></Field>
                     <Field label="Diária base (R$)"><Input type="number" step="0.01" value={form.diaria} onChange={(e) => setForm((prev) => ({ ...prev, diaria: e.target.value }))} disabled={semanaFechada} /></Field>
                     <Field label="CPF"><Input value={form.cpf} placeholder="000.000.000-00" onChange={(e) => setForm((prev) => ({ ...prev, cpf: diariasFormatCpf(e.target.value) }))} disabled={semanaFechada} /></Field>
+                    <Field label="Telefone"><Input value={form.telefone || ""} placeholder="(00) 00000-0000" onChange={(e) => setForm((prev) => ({ ...prev, telefone: e.target.value }))} disabled={semanaFechada} /></Field>
                     <Field label="Tipo chave PIX">
                       <SelectField
                         value={form.pixTipo}
@@ -5615,7 +5762,25 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
                 {semanas.map((item) => {
                   const active = String(item.id) === String(semanaAtivaId);
                   return (
-                    <button key={item.id} onClick={() => setSemanaAtivaId(String(item.id))} className={cn("w-full rounded-2xl border px-4 py-3 text-left transition-colors", active ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50")}>
+                    <button key={item.id} onClick={async () => {
+                      setSemanaAtivaId(String(item.id));
+                      setLancamentos(await diariasLoadLancamentos(String(item.id)));
+                      setForm((prev) => ({
+                        ...prev,
+                        nome: "",
+                        cargoPadrao: "",
+                        cargo: "",
+                        diaria: "",
+                        cpf: "",
+                        telefone: "",
+                        pixTipo: "",
+                        pix: "",
+                        dia: 0,
+                        noite: 0,
+                        sabado: 0,
+                        domingoFeriado: 0,
+                      }));
+                    }} className={cn("w-full rounded-2xl border px-4 py-3 text-left transition-colors", active ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50")}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-slate-900">{formatDateBR(item.semana_inicio)} até {formatDateBR(item.semana_fim)}</p>
@@ -5671,12 +5836,12 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
         <Card>
           <CardHeader title="Cargos & diárias" description="Cadastre, edite ou exclua cargos e diárias padrão." />
           <div className="p-5 space-y-5">
-            <form className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto_auto] gap-4 items-end" onSubmit={handleSalvarCargo}>
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto_auto] gap-4 items-end">
               <Field label="Cargo"><Input value={cargoForm.cargo} onChange={(e) => setCargoForm((prev) => ({ ...prev, cargo: e.target.value }))} /></Field>
-              <Field label="Diária padrão (R$)"><Input type="number" step="0.01" value={cargoForm.diaria} onChange={(e) => setCargoForm((prev) => ({ ...prev, diaria: e.target.value }))} /></Field>
-              <Button disabled={saving}>{cargoEditandoId ? "Salvar alteração" : "Adicionar cargo"}</Button>
+              <Field label="Diária padrão (R$)"><Input inputMode="decimal" placeholder="Ex.: 200,00" value={cargoForm.diaria} onChange={(e) => setCargoForm((prev) => ({ ...prev, diaria: e.target.value }))} /></Field>
+              <Button type="button" disabled={saving} onClick={handleSalvarCargo}>{saving ? "Salvando..." : (cargoEditandoId ? "Salvar alteração" : "Adicionar cargo")}</Button>
               {cargoEditandoId ? <Button variant="outline" type="button" onClick={() => { setCargoEditandoId(""); setCargoForm({ cargo: "", diaria: "" }); }}>Cancelar</Button> : <div />}
-            </form>
+            </div>
             <div className="overflow-auto">
               <table className="w-full min-w-[520px] text-sm">
                 <thead><tr className="text-left border-b border-slate-200 bg-slate-50"><th className="px-5 py-3">Cargo</th><th className="px-5 py-3 text-right">Diária</th><th className="px-5 py-3 text-right">Ações</th></tr></thead>
