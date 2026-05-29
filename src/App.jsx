@@ -5256,7 +5256,7 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
     return () => { cancelled = true; };
   }, [diariasSession?.user?.id]);
 
-  const isDiariasAdmin = authProfile?.role === "admin";
+  const isDiariasAdmin = true; // restrição removida
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -5467,33 +5467,9 @@ function DiariasPageIntegrada({ onBack, obraAtual }) {
     );
   }
 
-  if (!diariasSession) {
-    return (
-      <DiariasAuthCard
-        onBack={onBack}
-        email={loginEmail}
-        password={loginPassword}
-        setEmail={setLoginEmail}
-        setPassword={setLoginPassword}
-        onLogin={handleLogin}
-        loading={saving}
-        error={error}
-      />
-    );
-  }
+  // Login removido para acesso direto ao módulo de Diárias.
 
-  if (loading && !authProfile) {
-    return (
-      <div className="space-y-5">
-        <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700">
-            <CardHeader title="Diárias" description="Carregando permissões..." right={<div className="flex gap-2"><ReturnHomeButton onClick={onBack} /><Button variant="outline" onClick={handleLogout}>Sair</Button></div>} />
-          </div>
-          <div className="p-5 bg-white text-sm text-slate-600">Validando perfil do usuário.</div>
-        </Card>
-      </div>
-    );
-  }
+  // Validação de perfil removida.
 
   if (!isDiariasAdmin) {
     return (
