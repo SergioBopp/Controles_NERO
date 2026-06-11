@@ -5909,6 +5909,8 @@ export default function App() {
   const [stockNewCategory, setStockNewCategory] = useState("");
   const [stockGroupEditModal, setStockGroupEditModal] = useState(false);
   const [stockGroupEditForm, setStockGroupEditForm] = useState({ oldCategory: "", code: "", name: "" });
+  const [newStockGroupCode, setNewStockGroupCode] = useState("");
+  const [newStockGroupName, setNewStockGroupName] = useState("");
   const [stockCodeFeedback, setStockCodeFeedback] = useState("");
   const [legacyCleanupFeedback, setLegacyCleanupFeedback] = useState("");
   const [stockConsumptionModal, setStockConsumptionModal] = useState(false);
@@ -7672,6 +7674,50 @@ export default function App() {
   }
 
 
+function createStockGroup() {
+  const code = normalizeStockGroupCode(newStockGroupCode);
+  const name = String(newStockGroupName || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!/^[A-Z]{3}$/.test(code)) {
+    return setErrorMessage("O código deve ter exatamente 3 letras.");
+  }
+
+  if (!name) {
+    return setErrorMessage("Informe o nome do grupo.");
+  }
+
+  const newCategory = `${name} (${code})`;
+
+  const exists = (data.stockCategories || []).some(
+    (item) => extractStockGroupCode(item) === code
+  );
+
+  if (exists) {
+    return setErrorMessage("Já existe um grupo com este código.");
+  }
+
+  commitDataUpdate((prev) => ({
+    ...prev,
+    stockCategories: Array.from(
+      new Set([
+        ...(prev.stockCategories || []),
+        newCategory
+      ])
+    ).sort((a, b) =>
+      String(a).localeCompare(String(b), "pt-BR", {
+        sensitivity: "base"
+      })
+    )
+  }));
+
+  setNewStockGroupCode("");
+  setNewStockGroupName("");
+
+  setErrorMessage("");
+}
+
   function addStockCode() {
     const normalizedCode = String(stockForm.code || "").trim().toUpperCase();
     const normalizedDescription = String(stockForm.item || "").trim();
@@ -8327,6 +8373,49 @@ export default function App() {
           <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
             Altere o código e o nome do grupo. Os materiais continuam com seus saldos, movimentações, mínimos, notas fiscais e valores unitários preservados.
           </div>
+
+<div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-4">
+  <h3 className="font-semibold text-emerald-900">
+    Criar novo grupo
+  </h3>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+    <Field label="Código">
+      <input
+        value={newStockGroupCode}
+        onChange={(e) =>
+          setNewStockGroupCode(
+            normalizeStockGroupCode(e.target.value)
+          )
+        }
+        placeholder="EX: HID"
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3"
+      />
+    </Field>
+
+    <Field label="Nome do grupo">
+      <input
+        value={newStockGroupName}
+        onChange={(e) =>
+          setNewStockGroupName(e.target.value)
+        }
+        placeholder="Ex: Hidráulica"
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3"
+      />
+    </Field>
+
+    <Button
+      className="bg-emerald-600 hover:bg-emerald-700"
+      onClick={createStockGroup}
+    >
+      <Plus className="h-4 w-4" />
+      Criar grupo
+    </Button>
+  </div>
+</div>
+
+<hr className="border-slate-200" />
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <Field label="Grupo atual">
               <select
@@ -8349,7 +8438,12 @@ export default function App() {
               <Input
                 value={stockGroupEditForm.code}
                 maxLength={3}
-                onChange={(e) => setStockGroupEditForm((prev) => ({ ...prev, code: normalizeStockGroupCode(e.target.value) }))}
+                onChange={(e) =>
+  setStockGroupEditForm((prev) => ({
+    ...prev,
+    code: normalizeStockGroupCode(e.target.value)
+  }))
+}
                 placeholder="Ex.: SEV"
               />
             </Field>
