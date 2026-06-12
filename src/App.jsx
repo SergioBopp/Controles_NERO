@@ -1361,6 +1361,13 @@ function normalizeElectricalAlias(code, description) {
   const normalizedDescription = stripLeadingCodeFromDescription(description);
   const source = `${normalizedCode} ${normalizedDescription}`.toLowerCase();
 
+  // Blindagem: somente normaliza para materiais elétricos quando
+  // o código já for ELE-* ou a categoria elétrica tiver sido identificada.
+  // Evita que EQP, HID, DRM etc. contendo a palavra "cabo" sejam convertidos.
+  if (!normalizedCode.startsWith("ELE-")) {
+    return null;
+  }
+
   if (/(cabo|fio)/.test(source)) {
     if (/(1[\.,]?(?:50|5))\s*mm(?:²|2)?/.test(source)) {
       return { code: "ELE-001", description: "Fio 1,5 mm²", category: "⚡ Elétrica (ELE)" };
@@ -4049,6 +4056,21 @@ function calculateStockBalance(itemIds, stockMovements = [], fallbackQuantity = 
 }
 
 function buildStockBalanceRows(stockItems = [], stockMovements = [], catalogEntries = STOCK_CODE_CATALOG, hiddenGroupPrefixes = []) {
+
+  console.log(
+    "STOCKITEM EQP-005",
+    stockItems.find(
+      item => String(item?.item || "").includes("EQP-005")
+    )
+  );
+
+  console.log(
+    "EQP-005 encontrado?",
+    stockItems.find((i) =>
+      String(i?.item || "").includes("EQP-005")
+    )
+  );
+
   const hiddenPrefixSet = new Set((hiddenGroupPrefixes || []).map((item) => normalizeStockGroupCode(item)).filter(Boolean));
   const grouped = new Map();
 
@@ -4130,6 +4152,12 @@ function buildStockBalanceRows(stockItems = [], stockMovements = [], catalogEntr
       });
     }
   }
+  console.log(
+    "EQP vindos do grouped",
+    Array.from(grouped.values()).filter(
+      (r) => String(r.code || "").startsWith("EQP")
+    )
+  );
 
   const rows = Array.from(grouped.values()).map((row) => {
     const code = String(row?.code || "").trim().toUpperCase();
@@ -4146,6 +4174,25 @@ function buildStockBalanceRows(stockItems = [], stockMovements = [], catalogEntr
 
     return row;
   });
+
+  console.log(
+    "ROW EQP-005",
+    rows.find((r) => r.code === "EQP-005")
+  );
+  console.log(
+    "ROW EQP-005",
+    rows.find(
+      row => String(row?.code || "") === "EQP-005"
+    )
+  );
+
+  console.log(
+    "TODAS EQP",
+    rows.filter(
+      row => String(row?.code || "").startsWith("EQP")
+    )
+  );
+
 
   return rows.sort((a, b) =>
     String(a.code || "").localeCompare(String(b.code || ""), "pt-BR", {
@@ -6273,18 +6320,34 @@ export default function App() {
     setErrorMessage("");
     try {
       const [obrasRes, companiesRes, rolesRes, maintenanceRolesRes, stockRes, stockMovementsRes, maintenanceRes, attendanceRes, historyRes] = await Promise.all([
-        supabase.from("obras").select("*").order("id", { ascending: true }),
-        supabase.from("companies").select("*").order("id", { ascending: true }),
-        supabase.from("roles").select("*").order("id", { ascending: true }),
-        supabase.from("maintenance_roles").select("*").order("name", { ascending: true }),
-        supabase.from("stock_items").select("*").order("id", { ascending: true }),
-        supabase.from("stock_movements").select("*").order("movement_date", { ascending: false }),
-        supabase.from("maintenance_orders").select("*").order("id", { ascending: true }),
-        supabase.from("attendance_records").select("*").order("id", { ascending: true }),
-        supabase.from("history_snapshots").select("*").order("date", { ascending: false }),
-      ]);
+  supabase.from("obras").select("*").order("id", { ascending: true }),
+  supabase.from("companies").select("*").order("id", { ascending: true }),
+  supabase.from("roles").select("*").order("id", { ascending: true }),
+  supabase.from("maintenance_roles").select("*").order("name", { ascending: true }),
+  supabase.from("stock_items").select("*").order("id", { ascending: true }),
+  supabase.from("stock_movements").select("*").order("movement_date", { ascending: false }),
+  supabase.from("maintenance_orders").select("*").order("id", { ascending: true }),
+  supabase.from("attendance_records").select("*").order("id", { ascending: true }),
+  supabase.from("history_snapshots").select("*").order("date", { ascending: false }),
+]);
 
-      const errors = [obrasRes.error, companiesRes.error, rolesRes.error, maintenanceRolesRes.error, stockRes.error, stockMovementsRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
+console.log("STOCK ITEMS TOTAL", stockRes.data?.length);
+
+console.log(
+  "ID 25",
+  stockRes.data?.find(
+    row => String(row.id) === "25"
+  )
+);
+
+console.log(
+  "ITENS EQP",
+  stockRes.data?.filter(
+    row => String(row.item || "").toUpperCase().includes("EQP")
+  )
+);
+
+const errors = [obrasRes.error, companiesRes.error, rolesRes.error, maintenanceRolesRes.error, stockRes.error, stockMovementsRes.error, maintenanceRes.error, attendanceRes.error, historyRes.error].filter(Boolean);
       if (errors.length) throw errors[0];
 
       const nextData = {
@@ -6292,7 +6355,29 @@ export default function App() {
         companies: (companiesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, city: row.city })),
         roles: (rolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, companyId: row.company_id, name: row.name })),
         maintenanceRoles: (maintenanceRolesRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, name: row.name, daily: Number(row.daily || 0) })),
-        stock: (stockRes.data || []).map((row) => normalizeLegacyStockItem({ id: row.id, obraId: row.obra_id, item: row.item, unit: row.unit, quantity: row.quantity, min: row.min_quantity, category: row.category, invoice: row.invoice, price: row.price })),
+        stock: (stockRes.data || []).map((row) => {
+          if (Number(row.id) === 25) {
+            console.log("RAW ID 25", row);
+          }
+
+          const normalized = normalizeLegacyStockItem({
+            id: row.id,
+            obraId: row.obra_id,
+            item: row.item,
+            unit: row.unit,
+            quantity: row.quantity,
+            min: row.min_quantity,
+            category: row.category,
+            invoice: row.invoice,
+            price: row.price
+          });
+
+          if (Number(row.id) === 25) {
+            console.log("NORMALIZED ID 25", normalized);
+          }
+
+          return normalized;
+        }),
         stockMovements: (stockMovementsRes.data || []).map((row) => ({ id: row.id, obraId: row.obra_id, itemId: row.item_id, type: row.type, quantity: row.quantity, note: row.note, responsible: row.responsible, date: row.movement_date })),
         maintenance: (maintenanceRes.data || []).map((row) => calculateMaintenanceItem({
           id: row.id,
